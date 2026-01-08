@@ -19,14 +19,18 @@ const Customers: React.FC = () => {
     setLoading(true);
     setHasSearched(true);
     setCustomer(null);
+    setTransactions([]);
+
     try {
-      // Parallel fetch for demo purposes, normally dependent
-      const [custData, txData] = await Promise.all([
-        api.searchCustomer(searchTerm),
-        api.getCustomerTransactions('demo')
-      ]);
+      // 1. Search for customer first
+      const custData = await api.searchCustomer(searchTerm);
       setCustomer(custData);
-      setTransactions(txData);
+
+      // 2. If customer exists, fetch their transactions using the real ID
+      if (custData && custData.id) {
+         const txData = await api.getCustomerTransactions(custData.id);
+         setTransactions(txData);
+      }
     } catch (err) {
       console.error(err);
     } finally {

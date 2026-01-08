@@ -324,7 +324,7 @@ app.get('/api/customers/:id/transactions', async (req, res) => {
       SELECT t.*, w.customer_name, w.customer_phone
       FROM transactions t
       JOIN wallets w ON t.wallet_id = w.id
-      WHERE w.id = $1 OR w.customer_phone = $1
+      WHERE w.id::text = $1 OR w.customer_phone = $1
       ORDER BY t.created_at DESC
     `, [req.params.id]);
     res.json(result.rows);
