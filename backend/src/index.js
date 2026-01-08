@@ -87,6 +87,19 @@ const initDb = async () => {
       );
     `);
 
+    // 6. Automation Logs Table (For Analytics)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS automation_logs (
+        id SERIAL PRIMARY KEY,
+        job_id INTEGER, 
+        channel VARCHAR(20),
+        status VARCHAR(20),
+        converted BOOLEAN DEFAULT false,
+        revenue DECIMAL(10, 2) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Insert default settings if empty
     const settingsCheck = await db.query('SELECT * FROM app_settings WHERE id = 1');
     if (settingsCheck.rows.length === 0) {
@@ -98,7 +111,7 @@ const initDb = async () => {
     // Optional: Seed dummy wallet data if empty (for testing)
     const walletCheck = await db.query('SELECT COUNT(*) FROM wallets');
     if (parseInt(walletCheck.rows[0].count) === 0) {
-        console.log("Seeding demo data...");
+        console.log("Seeding demo wallet data...");
         const w = await db.query(`
             INSERT INTO wallets (phone_hash, customer_name, customer_phone, balance) 
             VALUES ('hash123', 'Demo Customer', '+15550001234', 150.00) RETURNING id
@@ -107,6 +120,37 @@ const initDb = async () => {
             INSERT INTO transactions (wallet_id, order_id, coins, type, order_amount)
             VALUES ($1, '#1001', 150.00, 'CREDIT', 500.00)
         `, [w.rows[0].id]);
+    }
+
+    // Optional: Seed automation logs if empty (for analytics demo)
+    const logsCheck = await db.query('SELECT COUNT(*) FROM automation_logs');
+    if (parseInt(logsCheck.rows[0].count) === 0) {
+       console.log("Seeding automation logs for analytics...");
+       const logs = [];
+       // Generate 200 logs over the last 60 days
+       for(let i=0; i<200; i++) {
+         const daysAgo = Math.floor(Math.random() * 60);
+         const date = new Date();
+         date.setDate(date.getDate() - daysAgo);
+         
+         const isConverted = Math.random() > 0.85; // 15% conversion rate
+         const revenue = isConverted ? (Math.random() * 100 + 20).toFixed(2) : 0;
+         
+         // Format timestamp for PostgreSQL
+         const timestamp = date.toISOString().replace('T', ' ').replace('Z', '');
+         
+         logs.push(`(1, 'SMS', 'SENT', ${isConverted}, ${revenue}, '${timestamp}')`);
+       }
+       
+       // Bulk insert in chunks to be safe with string length
+       const chunkSize = 50;
+       for (let i = 0; i < logs.length; i += chunkSize) {
+          const chunk = logs.slice(i, i + chunkSize);
+          await db.query(`
+            INSERT INTO automation_logs (job_id, channel, status, converted, revenue, created_at)
+            VALUES ${chunk.join(',')}
+          `);
+       }
     }
     
     console.log("Database tables checked/initialized successfully.");
@@ -433,28 +477,77 @@ app.delete('/api/automations/:id', async (req, res) => {
   }
 });
 
-// 13. Automation Analytics
+// 13. Automation Analytics (Dynamic)
 app.get('/api/automations/analytics', async (req, res) => {
-  // Logic remains similar to the mock generator for now, as we don't have an automation_logs table in this schema yet.
-  const period = req.query.period || 'DAILY';
-  let labels = [], sent = [], converted = [];
-  
-  if (period === 'DAILY') {
-    labels = Array.from({length: 7}, (_, i) => {
-        const d = new Date(); d.setDate(d.getDate() - (6 - i));
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  try {
+    const period = req.query.period || 'DAILY';
+    let intervalStr = '7 days';
+    let dateFormat = 'Dy Mon DD';
+    let groupBy = 'DATE(created_at)';
+    let orderBy = 'DATE(created_at)';
+    
+    if (period === 'MONTHLY') {
+       intervalStr = '12 months';
+       dateFormat = 'Mon YYYY';
+       groupBy = "TO_CHAR(created_at, 'YYYY-MM')";
+       orderBy = "TO_CHAR(created_at, 'YYYY-MM')";
+    } else if (period === 'YEARLY') {
+       intervalStr = '5 years';
+       dateFormat = 'YYYY';
+       groupBy = "TO_CHAR(created_at, 'YYYY')";
+       orderBy = "TO_CHAR(created_at, 'YYYY')";
+    }
+
+    // 1. Chart Data Query
+    const chartQuery = `
+      SELECT 
+        TO_CHAR(created_at, '${dateFormat}') as label,
+        COUNT(*) as sent,
+        COUNT(CASE WHEN converted THEN 1 END) as converted
+      FROM automation_logs
+      WHERE created_at >= NOW() - INTERVAL '${intervalStr}'
+      GROUP BY 1, ${groupBy}
+      ORDER BY ${orderBy} ASC
+    `;
+
+    // 2. Summary Query
+    const summaryQuery = `
+      SELECT 
+        COUNT(*) as total_sent,
+        COUNT(CASE WHEN converted THEN 1 END) as total_converted,
+        SUM(revenue) as revenue
+      FROM automation_logs
+      WHERE created_at >= NOW() - INTERVAL '${intervalStr}'
+    `;
+
+    const [chartRes, summaryRes] = await Promise.all([
+       db.query(chartQuery),
+       db.query(summaryQuery)
+    ]);
+
+    const s = summaryRes.rows[0];
+    const totalSent = parseInt(s.total_sent || 0);
+    const totalConverted = parseInt(s.total_converted || 0);
+    const revenue = parseFloat(s.revenue || 0);
+
+    res.json({
+      summary: {
+        totalSent,
+        totalConverted,
+        conversionRate: totalSent > 0 ? parseFloat(((totalConverted / totalSent) * 100).toFixed(1)) : 0,
+        revenueGenerated: revenue
+      },
+      chartData: chartRes.rows.map(r => ({
+        label: r.label,
+        sent: parseInt(r.sent),
+        converted: parseInt(r.converted)
+      }))
     });
-    sent = [40, 55, 30, 80, 45, 60, 90];
-    converted = [4, 10, 3, 12, 8, 9, 15];
-  } else {
-    // ... logic for monthly/yearly
-    labels = ['Jan', 'Feb', 'Mar']; sent = [500, 600, 750]; converted = [50, 70, 90];
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching analytics' });
   }
-  
-  res.json({
-    summary: { totalSent: 2500, totalConverted: 350, conversionRate: 14.0, revenueGenerated: 15750 },
-    chartData: labels.map((l, i) => ({ label: l, sent: sent[i], converted: converted[i] }))
-  });
 });
 
 app.listen(PORT, () => {
