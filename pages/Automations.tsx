@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Plus, 
   Bell, 
@@ -324,9 +325,9 @@ const Automations: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Overlay */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+      {/* Modal Overlay with Portal */}
+      {showModal && createPortal(
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
            <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in relative">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                  <h2 className="text-lg font-bold text-slate-900">Create Automation Job</h2>
@@ -416,7 +417,8 @@ const Automations: React.FC = () => {
                  <button onClick={handleCreate} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-600/20">Create Job</button>
               </div>
            </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
