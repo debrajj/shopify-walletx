@@ -48,7 +48,7 @@ export interface AppSettings {
   // Custom API Integration
   useCustomApi: boolean;
   customApiConfig: {
-    baseUrl: string; // This is now specifically the Wallet Balance Endpoint URL
+    walletBalanceUrl: string; // Specific URL for fetching wallet balance
     authHeaderKey: string;
     authHeaderValue: string;
   };

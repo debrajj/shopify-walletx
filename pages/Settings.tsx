@@ -51,12 +51,12 @@ const Settings: React.FC = () => {
   };
 
   const handleTestConnection = async () => {
-    if (!settings?.customApiConfig.baseUrl || !testPhone) return;
+    if (!settings?.customApiConfig.walletBalanceUrl || !testPhone) return;
     setIsTesting(true);
     setTestResult(null);
     try {
       const result = await api.testIntegration({
-        url: settings.customApiConfig.baseUrl,
+        url: settings.customApiConfig.walletBalanceUrl,
         authKey: settings.customApiConfig.authHeaderKey,
         authValue: settings.customApiConfig.authHeaderValue,
         testPhone: testPhone
@@ -278,10 +278,10 @@ const Settings: React.FC = () => {
                     <input 
                       type="text" 
                       placeholder="https://api.yourdomain.com/v1/wallet/balance"
-                      value={settings.customApiConfig.baseUrl}
+                      value={settings.customApiConfig.walletBalanceUrl}
                       onChange={(e) => setSettings({
                         ...settings,
-                        customApiConfig: { ...settings.customApiConfig, baseUrl: e.target.value }
+                        customApiConfig: { ...settings.customApiConfig, walletBalanceUrl: e.target.value }
                       })}
                       className="flex-1 min-w-0 block w-full px-3 py-2.5 rounded-none rounded-r-md border border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                     />
@@ -385,7 +385,7 @@ const Settings: React.FC = () => {
                   <div className="mt-auto">
                      <button
                         onClick={handleTestConnection}
-                        disabled={isTesting || !settings?.customApiConfig.baseUrl}
+                        disabled={isTesting || !settings?.customApiConfig.walletBalanceUrl}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                      >
                         {isTesting ? (

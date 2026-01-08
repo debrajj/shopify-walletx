@@ -30,6 +30,7 @@ const initDb = async () => {
     `);
     
     // 2. App Settings Table
+    // Updated to use specific wallet_balance_url
     await db.query(`
       CREATE TABLE IF NOT EXISTS app_settings (
         id SERIAL PRIMARY KEY,
@@ -40,7 +41,7 @@ const initDb = async () => {
         sms_provider VARCHAR(50) DEFAULT 'TWILIO',
         sms_api_key VARCHAR(255) DEFAULT '',
         use_custom_api BOOLEAN DEFAULT false,
-        custom_api_base_url VARCHAR(255) DEFAULT '',
+        custom_api_wallet_balance_url VARCHAR(255) DEFAULT '',
         custom_api_auth_header_key VARCHAR(100) DEFAULT '',
         custom_api_auth_header_value VARCHAR(255) DEFAULT ''
       );
@@ -230,10 +231,10 @@ app.get('/api/wallet/balance', async (req, res) => {
     let externalSyncSuccess = false;
 
     // --- EXTERNAL API SYNC LOGIC ---
-    if (settings.use_custom_api && settings.custom_api_base_url) {
+    if (settings.use_custom_api && settings.custom_api_wallet_balance_url) {
        try {
          // Construct URL with params
-         const urlObj = new URL(settings.custom_api_base_url);
+         const urlObj = new URL(settings.custom_api_wallet_balance_url);
          urlObj.searchParams.append('phone', phone);
          urlObj.searchParams.append('shop', shop);
          
@@ -664,7 +665,7 @@ app.get('/api/settings', async (req, res) => {
       smsApiKey: row.sms_api_key,
       useCustomApi: row.use_custom_api,
       customApiConfig: {
-        baseUrl: row.custom_api_base_url,
+        walletBalanceUrl: row.custom_api_wallet_balance_url, // Mapped to new column
         authHeaderKey: row.custom_api_auth_header_key,
         authHeaderValue: row.custom_api_auth_header_value
       }
@@ -687,14 +688,14 @@ app.put('/api/settings', async (req, res) => {
         sms_provider = $5,
         sms_api_key = $6,
         use_custom_api = $7,
-        custom_api_base_url = $8,
+        custom_api_wallet_balance_url = $8,
         custom_api_auth_header_key = $9,
         custom_api_auth_header_value = $10
       WHERE id = 1
     `, [
       s.isWalletEnabled, s.isOtpEnabled, s.otpExpirySeconds, s.maxWalletUsagePercent,
       s.smsProvider, s.smsApiKey, s.useCustomApi, 
-      s.customApiConfig.baseUrl, s.customApiConfig.authHeaderKey, s.customApiConfig.authHeaderValue
+      s.customApiConfig.walletBalanceUrl, s.customApiConfig.authHeaderKey, s.customApiConfig.authHeaderValue
     ]);
     res.json(s);
   } catch (err) {
