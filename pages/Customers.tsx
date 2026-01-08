@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ShoppingBag, Coins, CreditCard, User, Phone } from 'lucide-react';
+import { Search, ShoppingBag, Coins, CreditCard, User, Phone, Plus, X, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 import { CustomerSummary, Transaction } from '../types';
 import TransactionTable from '../components/TransactionTable';
@@ -12,8 +12,13 @@ const Customers: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Add Coins Modal
+  const [showAddCoinsModal, setShowAddCoinsModal] = useState(false);
+  const [addCoinsForm, setAddCoinsForm] = useState({ coins: '', description: '' });
+  const [addCoinsStatus, setAddCoinsStatus] = useState<'IDLE' | 'SUBMITTING' | 'SUCCESS'>('IDLE');
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!searchTerm.trim()) return;
 
     setLoading(true);
@@ -38,8 +43,42 @@ const Customers: React.FC = () => {
     }
   };
 
+  const handleAddCoins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customer) return;
+
+    setAddCoinsStatus('SUBMITTING');
+    try {
+      await api.addCoins({
+        phone: customer.phone,
+        coins: parseFloat(addCoinsForm.coins),
+        description: addCoinsForm.description || 'Manual addition via Customer Profile'
+      });
+      setAddCoinsStatus('SUCCESS');
+      
+      // Refresh customer data
+      const updatedCust = await api.searchCustomer(customer.phone);
+      if (updatedCust && updatedCust.id) {
+        setCustomer(updatedCust);
+        const txData = await api.getCustomerTransactions(updatedCust.id);
+        setTransactions(txData);
+      }
+
+      setTimeout(() => {
+        setShowAddCoinsModal(false);
+        setAddCoinsStatus('IDLE');
+        setAddCoinsForm({ coins: '', description: '' });
+      }, 1500);
+
+    } catch (err) {
+      console.error(err);
+      setAddCoinsStatus('IDLE');
+      alert('Failed to add coins.');
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Customer Lookup</h1>
         <p className="text-sm text-slate-500 mt-1">Search for a customer to view their wallet balance and activity.</p>
@@ -91,9 +130,18 @@ const Customers: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="text-center md:text-right bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-              <p className="text-sm font-medium text-emerald-800 uppercase tracking-wide">Current Balance</p>
-              <p className="text-3xl font-bold text-emerald-700 mt-1">{customer.balance} Coins</p>
+            <div className="flex flex-col md:items-end gap-3">
+              <div className="text-center md:text-right bg-emerald-50 p-4 rounded-xl border border-emerald-100 min-w-[200px]">
+                <p className="text-sm font-medium text-emerald-800 uppercase tracking-wide">Current Balance</p>
+                <p className="text-3xl font-bold text-emerald-700 mt-1">{customer.balance} Coins</p>
+              </div>
+              <button 
+                onClick={() => setShowAddCoinsModal(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors w-full"
+              >
+                <Plus className="h-4 w-4" />
+                Add Coins
+              </button>
             </div>
           </div>
 
@@ -129,6 +177,79 @@ const Customers: React.FC = () => {
           <User className="h-12 w-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-slate-900">Customer Not Found</h3>
           <p className="text-slate-500">We couldn't find any wallet associated with that search term.</p>
+        </div>
+      )}
+
+      {/* Add Coins Modal */}
+      {showAddCoinsModal && customer && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in relative">
+            {addCoinsStatus === 'SUCCESS' ? (
+              <div className="p-8 text-center space-y-4">
+                <div className="mx-auto h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Balance Updated!</h3>
+                <p className="text-slate-500">Successfully added {addCoinsForm.coins} coins to {customer.name}.</p>
+              </div>
+            ) : (
+              <>
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                  <h2 className="text-lg font-bold text-slate-900">Add Coins Manually</h2>
+                  <button 
+                    onClick={() => setShowAddCoinsModal(false)} 
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-all"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <form onSubmit={handleAddCoins} className="p-6 space-y-4">
+                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
+                      <p className="text-sm text-slate-500">Adding to wallet of:</p>
+                      <p className="font-semibold text-slate-900">{customer.name} <span className="text-slate-400 font-normal">({customer.phone})</span></p>
+                   </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Amount (Coins)</label>
+                    <input 
+                      type="number" 
+                      required
+                      min="1"
+                      placeholder="e.g. 100"
+                      value={addCoinsForm.coins}
+                      onChange={(e) => setAddCoinsForm({...addCoinsForm, coins: e.target.value})}
+                      className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Reason / Note</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Refund #1001"
+                      value={addCoinsForm.description}
+                      onChange={(e) => setAddCoinsForm({...addCoinsForm, description: e.target.value})}
+                      className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm shadow-sm"
+                    />
+                  </div>
+                  <div className="pt-2 flex justify-end gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setShowAddCoinsModal(false)}
+                      className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/50 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={addCoinsStatus === 'SUBMITTING'}
+                      className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {addCoinsStatus === 'SUBMITTING' ? 'Updating...' : 'Add Coins'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

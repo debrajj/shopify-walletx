@@ -125,6 +125,13 @@ export const api = {
     return request<Transaction[]>(`/customers/${customerId}/transactions`);
   },
 
+  addCoins: async (data: { phone: string; coins: number; description?: string }): Promise<{ success: boolean; newBalance: number }> => {
+    return request('/wallet/credit', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
   // --- AUTOMATIONS ---
   getAutomationJobs: async (): Promise<AutomationJob[]> => {
     return request<AutomationJob[]>('/automations');

@@ -181,7 +181,8 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    // Cast id to text for frontend compatibility
+    const result = await db.query('SELECT id::text, name, email, password_hash, store_name, store_url FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -222,10 +223,11 @@ app.post('/api/auth/signup', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
+    // Cast id to text
     const result = await db.query(`
       INSERT INTO users (name, email, password_hash, store_name, store_url)
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, name, email, store_name
+      RETURNING id::text, name, email, store_name
     `, [name, email, hash, storeName, storeUrl]);
 
     res.status(201).json({
@@ -410,7 +412,56 @@ app.post('/api/wallet/deduct', async (req, res) => {
   }
 });
 
-// 6. Webhook: Orders Paid
+// 6. Credit Coins (Admin/API) - New
+app.post('/api/wallet/credit', async (req, res) => {
+  try {
+    const { phone, coins, description } = req.body;
+    const amount = parseFloat(coins);
+
+    if (!phone || isNaN(amount)) {
+      return res.status(400).json({ success: false, message: 'Invalid input' });
+    }
+
+    // Check if wallet exists
+    const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1', [phone]);
+    let walletId;
+    let currentBalance = 0;
+
+    if (walletRes.rows.length === 0) {
+      // Create new wallet
+      // Use phone as hash for simplicity in this demo
+      const newWallet = await db.query(`
+        INSERT INTO wallets (phone_hash, customer_name, customer_phone, balance)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, balance
+      `, [phone, 'Guest', phone, amount]);
+      walletId = newWallet.rows[0].id;
+      currentBalance = parseFloat(newWallet.rows[0].balance);
+    } else {
+      // Update existing
+      const w = walletRes.rows[0];
+      walletId = w.id;
+      currentBalance = parseFloat(w.balance) + amount;
+      await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [currentBalance, walletId]);
+    }
+
+    // Log Transaction
+    await db.query(`
+      INSERT INTO transactions (wallet_id, order_id, coins, type, status, order_amount)
+      VALUES ($1, $2, $3, 'CREDIT', 'COMPLETED', 0)
+    `, [walletId, description || 'ADMIN_BONUS', amount]);
+
+    res.json({
+      success: true,
+      newBalance: currentBalance
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// 7. Webhook: Orders Paid
 app.post('/webhooks/orders/paid', async (req, res) => {
   try {
     const order = req.body;
@@ -435,7 +486,9 @@ app.post('/webhooks/orders/paid', async (req, res) => {
            const wallet = walletRes.rows[0];
            
            // Check if transaction already exists (Idempotency)
-           const txnCheck = await db.query('SELECT * FROM transactions WHERE order_id = $1 AND type = \'DEBIT\'', [order.id.toString()]);
+           // Ensure order.id is treated as a string
+           const orderIdStr = order.id ? order.id.toString() : '';
+           const txnCheck = await db.query('SELECT * FROM transactions WHERE order_id = $1 AND type = \'DEBIT\'', [orderIdStr]);
            
            if (txnCheck.rows.length === 0) {
               const newBalance = parseFloat(wallet.balance) - amount;
@@ -446,11 +499,11 @@ app.post('/webhooks/orders/paid', async (req, res) => {
               await db.query(`
                 INSERT INTO transactions (wallet_id, order_id, coins, type, status, order_amount)
                 VALUES ($1, $2, $3, 'DEBIT', 'COMPLETED', $4)
-              `, [wallet.id, order.id.toString(), amount, parseFloat(order.total_price)]);
+              `, [wallet.id, orderIdStr, amount, parseFloat(order.total_price)]);
               
-              console.log(`Deducted ${amount} coins from ${phone} for order ${order.id}`);
+              console.log(`Deducted ${amount} coins from ${phone} for order ${orderIdStr}`);
            } else {
-              console.log(`Transaction already processed for order ${order.id}`);
+              console.log(`Transaction already processed for order ${orderIdStr}`);
            }
         }
       }
@@ -511,8 +564,10 @@ app.get('/api/transactions', async (req, res) => {
     const search = req.query.search || '';
     const offset = (page - 1) * limit;
 
+    // Explicitly select and cast id fields to text
     let query = `
-      SELECT t.*, w.customer_name, w.customer_phone 
+      SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at,
+             w.customer_name, w.customer_phone 
       FROM transactions t
       JOIN wallets w ON t.wallet_id = w.id
     `;
@@ -554,7 +609,8 @@ app.get('/api/transactions', async (req, res) => {
 app.get('/api/transactions/all', async (req, res) => {
   try {
     const result = await db.query(`
-      SELECT t.*, w.customer_name, w.customer_phone 
+      SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at, 
+             w.customer_name, w.customer_phone 
       FROM transactions t
       JOIN wallets w ON t.wallet_id = w.id
       ORDER BY t.created_at DESC LIMIT 1000
@@ -571,8 +627,10 @@ app.get('/api/customers/search', async (req, res) => {
     const { q } = req.query;
     if (!q) return res.json(null);
 
+    // Cast id to text
     const result = await db.query(`
-      SELECT * FROM wallets 
+      SELECT id::text, phone_hash, customer_name, customer_phone, balance, created_at, updated_at
+      FROM wallets 
       WHERE customer_name ILIKE $1 OR customer_phone ILIKE $1 
       LIMIT 1
     `, [`%${q}%`]);
@@ -604,7 +662,8 @@ app.get('/api/customers/search', async (req, res) => {
 app.get('/api/customers/:id/transactions', async (req, res) => {
   try {
     const result = await db.query(`
-      SELECT t.*, w.customer_name, w.customer_phone
+      SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at,
+             w.customer_name, w.customer_phone
       FROM transactions t
       JOIN wallets w ON t.wallet_id = w.id
       WHERE w.id::text = $1 OR w.customer_phone = $1
@@ -673,7 +732,7 @@ app.put('/api/settings', async (req, res) => {
 // 9. Automations GET
 app.get('/api/automations', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM automation_jobs ORDER BY created_at DESC');
+    const result = await db.query('SELECT id::text, name, condition_type, condition_value, action_channel, status, last_run, created_at FROM automation_jobs ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
     res.json([]);
@@ -687,7 +746,7 @@ app.post('/api/automations', async (req, res) => {
     const result = await db.query(`
       INSERT INTO automation_jobs (name, condition_type, condition_value, action_channel, status)
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
+      RETURNING id::text, name, condition_type, condition_value, action_channel, status, last_run, created_at
     `, [name, condition_type, condition_value, action_channel, status]);
     res.json(result.rows[0]);
   } catch (err) {

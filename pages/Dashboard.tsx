@@ -6,7 +6,9 @@ import {
   Activity, 
   TrendingUp,
   Users,
-  ArrowRight
+  ArrowRight,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -28,25 +30,54 @@ const Dashboard: React.FC = () => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Bonus Modal State
+  const [showBonusModal, setShowBonusModal] = useState(false);
+  const [bonusForm, setBonusForm] = useState({ phone: '', coins: '', description: '' });
+  const [bonusStatus, setBonusStatus] = useState<'IDLE' | 'SUBMITTING' | 'SUCCESS'>('IDLE');
+
+  const loadData = async () => {
+    try {
+      const [statsData, txnsResponse, chart] = await Promise.all([
+        api.getStats(),
+        api.getTransactions({ page: 1, limit: 5 }),
+        api.getRevenueData()
+      ]);
+      setStats(statsData);
+      setRecentTransactions(txnsResponse.data);
+      setChartData(chart);
+    } catch (err) {
+      console.error("Failed to load dashboard data", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [statsData, txnsResponse, chart] = await Promise.all([
-          api.getStats(),
-          api.getTransactions({ page: 1, limit: 5 }),
-          api.getRevenueData()
-        ]);
-        setStats(statsData);
-        setRecentTransactions(txnsResponse.data);
-        setChartData(chart);
-      } catch (err) {
-        console.error("Failed to load dashboard data", err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
   }, []);
+
+  const handleIssueBonus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBonusStatus('SUBMITTING');
+    try {
+      await api.addCoins({
+        phone: bonusForm.phone,
+        coins: parseFloat(bonusForm.coins),
+        description: bonusForm.description || 'Bonus issued from Dashboard'
+      });
+      setBonusStatus('SUCCESS');
+      setTimeout(() => {
+        setShowBonusModal(false);
+        setBonusStatus('IDLE');
+        setBonusForm({ phone: '', coins: '', description: '' });
+        loadData(); // Refresh stats
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      setBonusStatus('IDLE');
+      alert('Failed to issue bonus. Please check inputs.');
+    }
+  };
 
   if (loading) {
     return (
@@ -57,7 +88,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -65,7 +96,10 @@ const Dashboard: React.FC = () => {
           <p className="mt-1 text-sm text-slate-500">Welcome back! Here's what's happening with your wallet program.</p>
         </div>
         <div className="flex gap-3">
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 shadow-sm rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all">
+          <button 
+            onClick={() => setShowBonusModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 shadow-sm rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all"
+          >
             <Coins className="h-4 w-4" />
             Issue Bonus
           </button>
@@ -171,11 +205,15 @@ const Dashboard: React.FC = () => {
              <h2 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h2>
              <div className="grid grid-cols-1 gap-3">
                 {[
-                   { label: 'Issue Bonus Coins', icon: Coins, desc: 'Send coins to specific users' },
+                   { label: 'Issue Bonus Coins', icon: Coins, desc: 'Send coins to specific users', action: () => setShowBonusModal(true) },
                    { label: 'Review Flagged Users', icon: Users, desc: '2 users require attention' },
                    { label: 'Configure Auto-Refill', icon: Activity, desc: 'Manage automated rules' }
                 ].map((action, i) => (
-                   <button key={i} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-all group text-left">
+                   <button 
+                    key={i} 
+                    onClick={action.action}
+                    className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-all group text-left w-full"
+                   >
                       <div className="flex items-center gap-3">
                          <div className="p-2 rounded-lg bg-white shadow-sm text-slate-400 group-hover:text-emerald-600 transition-colors">
                             <action.icon className="h-5 w-5" />
@@ -220,6 +258,86 @@ const Dashboard: React.FC = () => {
         </div>
         <TransactionTable transactions={recentTransactions} />
       </div>
+
+      {/* Bonus Modal */}
+      {showBonusModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in relative">
+            {bonusStatus === 'SUCCESS' ? (
+              <div className="p-8 text-center space-y-4">
+                <div className="mx-auto h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Coins Added!</h3>
+                <p className="text-slate-500">Successfully added {bonusForm.coins} coins to {bonusForm.phone}.</p>
+              </div>
+            ) : (
+              <>
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                  <h2 className="text-lg font-bold text-slate-900">Issue Bonus Coins</h2>
+                  <button 
+                    onClick={() => setShowBonusModal(false)} 
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-all"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <form onSubmit={handleIssueBonus} className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Customer Phone</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="+15550000000"
+                      value={bonusForm.phone}
+                      onChange={(e) => setBonusForm({...bonusForm, phone: e.target.value})}
+                      className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Amount (Coins)</label>
+                    <input 
+                      type="number" 
+                      required
+                      min="1"
+                      placeholder="e.g. 50"
+                      value={bonusForm.coins}
+                      onChange={(e) => setBonusForm({...bonusForm, coins: e.target.value})}
+                      className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Reason / Note</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Loyalty Reward"
+                      value={bonusForm.description}
+                      onChange={(e) => setBonusForm({...bonusForm, description: e.target.value})}
+                      className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm shadow-sm"
+                    />
+                  </div>
+                  <div className="pt-2 flex justify-end gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setShowBonusModal(false)}
+                      className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/50 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={bonusStatus === 'SUBMITTING'}
+                      className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {bonusStatus === 'SUBMITTING' ? 'Issuing...' : 'Issue Coins'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
