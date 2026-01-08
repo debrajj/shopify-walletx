@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wallet, Store, ArrowRight, Loader2, Lock, Mail, User, Key } from 'lucide-react';
+import { Wallet, Store, ArrowRight, Loader2, Lock, Mail, User, Key, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const LoginPage: React.FC = () => {
@@ -9,7 +9,9 @@ const LoginPage: React.FC = () => {
     name: '',
     email: '',
     password: '',
-    storeUrl: ''
+    storeUrl: '',
+    shopifyAccessToken: '',
+    shopifyApiKey: ''
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +38,9 @@ const LoginPage: React.FC = () => {
           email: formData.email,
           password: formData.password,
           storeName: formData.storeUrl.split('.')[0] || 'My Store',
-          storeUrl: formData.storeUrl
+          storeUrl: formData.storeUrl,
+          shopifyAccessToken: formData.shopifyAccessToken,
+          shopifyApiKey: formData.shopifyApiKey
         });
       }
       navigate('/dashboard');
@@ -56,7 +60,7 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900">
-          {isLoginMode ? 'Sign in to ShopWallet' : 'Create your account'}
+          {isLoginMode ? 'Sign in to ShopWallet' : 'Connect your Store'}
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
           {isLoginMode ? "Don't have an account?" : "Already have an account?"}{' '}
@@ -64,7 +68,7 @@ const LoginPage: React.FC = () => {
             onClick={() => {
               setIsLoginMode(!isLoginMode);
               setError('');
-              setFormData({ name: '', email: '', password: '', storeUrl: '' });
+              setFormData({ name: '', email: '', password: '', storeUrl: '', shopifyAccessToken: '', shopifyApiKey: '' });
             }}
             className="font-medium text-emerald-600 hover:text-emerald-500"
           >
@@ -120,6 +124,38 @@ const LoginPage: React.FC = () => {
                       onChange={handleChange}
                     />
                   </div>
+                  <p className="mt-1 text-xs text-slate-500">Must be a valid .myshopify.com URL</p>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                        <Shield className="h-4 w-4 text-emerald-600" />
+                        <span>Shopify Credentials</span>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-600">Admin API Access Token</label>
+                        <input
+                            name="shopifyAccessToken"
+                            type="password"
+                            required={!isLoginMode}
+                            className="mt-1 block w-full rounded-lg border-slate-300 focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm py-2"
+                            placeholder="shpat_xxxxxxxx..."
+                            value={formData.shopifyAccessToken}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-600">API Key</label>
+                        <input
+                            name="shopifyApiKey"
+                            type="password"
+                            required={!isLoginMode}
+                            className="mt-1 block w-full rounded-lg border-slate-300 focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm py-2"
+                            placeholder="xxxxxxxx..."
+                            value={formData.shopifyApiKey}
+                            onChange={handleChange}
+                        />
+                    </div>
                 </div>
               </>
             )}
@@ -169,7 +205,7 @@ const LoginPage: React.FC = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {isLoginMode ? 'Signing In...' : 'Creating Account...'}
+                  {isLoginMode ? 'Signing In...' : 'Connecting Store...'}
                 </>
               ) : (
                 <>

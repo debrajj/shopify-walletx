@@ -9,9 +9,18 @@ const getActiveConfig = (): { baseUrl: string; headers: Record<string, string> }
   let baseUrl = DEFAULT_API_BASE;
   let headers: Record<string, string> = {};
   
-  // Note: For the main API calls to *our* backend, we don't change the base URL 
-  // based on the custom API settings anymore, because the backend now proxies the request.
-  // We keep the logic simple to always point to our backend.
+  // Extract shop URL from logged-in user to send as header for tenant identification in Admin API
+  const userStr = localStorage.getItem('shopwallet_user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      if (user.storeUrl) {
+        headers['x-shop-url'] = user.storeUrl;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
   
   return { baseUrl, headers };
 };
@@ -20,20 +29,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const { baseUrl, headers: customHeaders } = getActiveConfig();
   const url = `${baseUrl}${path}`;
 
-  // Get Auth Token if exists (for standard Login flow)
-  const userStr = localStorage.getItem('shopwallet_user');
-  const tokenHeader: Record<string, string> = {};
-  if (userStr) {
-    // In a real app, you'd store a JWT token. For now, we simulate auth context.
-    // Ideally: const { token } = JSON.parse(userStr);
-    // tokenHeader['Authorization'] = `Bearer ${token}`;
-  }
-
   const response = await fetch(url, {
     ...options,
     headers: { 
       'Content-Type': 'application/json',
-      ...tokenHeader,
       ...customHeaders,
       ...(options?.headers || {})
     },
@@ -57,7 +56,8 @@ export const api = {
         body: JSON.stringify({ email, password })
       });
     },
-    signup: async (data: { name: string; email: string; password: string; storeName: string; storeUrl: string }) => {
+    // Updated Signup Signature
+    signup: async (data: { name: string; email: string; password: string; storeName: string; storeUrl: string; shopifyAccessToken: string; shopifyApiKey: string }) => {
       return request<{ user: any }>('/auth/signup', {
         method: 'POST',
         body: JSON.stringify(data)
@@ -104,7 +104,6 @@ export const api = {
     return updated;
   },
 
-  // Test the custom API integration via our backend proxy
   testIntegration: async (config: { url: string; authKey: string; authValue: string; testPhone: string }) => {
     return request<{ success: boolean; data?: any; message?: string }>('/settings/test-integration', {
       method: 'POST',

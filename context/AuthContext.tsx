@@ -6,13 +6,14 @@ interface User {
   name: string;
   email: string;
   storeName: string;
+  storeUrl?: string; // Add storeUrl to user interface
 }
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (data: { name: string; email: string; password: string; storeName: string; storeUrl: string }) => Promise<void>;
+  signup: (data: { name: string; email: string; password: string; storeName: string; storeUrl: string; shopifyAccessToken: string; shopifyApiKey: string }) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -49,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(true);
   };
 
-  const signup = async (data: { name: string; email: string; password: string; storeName: string; storeUrl: string }) => {
+  const signup = async (data: { name: string; email: string; password: string; storeName: string; storeUrl: string; shopifyAccessToken: string; shopifyApiKey: string }) => {
     const response = await api.auth.signup(data);
     const userData = response.user;
     
