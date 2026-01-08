@@ -627,9 +627,9 @@ app.get('/api/customers/search', async (req, res) => {
     const { q } = req.query;
     if (!q) return res.json(null);
 
-    // Cast id to text
+    // Cast id to text, alias customer_name as name, customer_phone as phone
     const result = await db.query(`
-      SELECT id::text, phone_hash, customer_name, customer_phone, balance, created_at, updated_at
+      SELECT id::text, phone_hash, customer_name as name, customer_phone as phone, balance, created_at, updated_at
       FROM wallets 
       WHERE customer_name ILIKE $1 OR customer_phone ILIKE $1 
       LIMIT 1
