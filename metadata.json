@@ -1,0 +1,5 @@
+{
+  "name": "Shopify Wallet & Coins Admin",
+  "description": "Admin dashboard for managing customer wallets, coin transactions, and OTP settings for the Shopify Wallet & Coins app.",
+  "requestFramePermissions": []
+}
