@@ -3,6 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const db = require('./config/db');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -96,6 +97,18 @@ const initDb = async () => {
         status VARCHAR(20),
         converted BOOLEAN DEFAULT false,
         revenue DECIMAL(10, 2) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 7. OTP Sessions Table (New)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS otp_sessions (
+        id VARCHAR(50) PRIMARY KEY,
+        phone VARCHAR(50),
+        otp VARCHAR(10),
+        expires_at TIMESTAMP,
+        is_used BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -221,6 +234,232 @@ app.post('/api/auth/signup', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error processing signup' });
+  }
+});
+
+// --- STOREFRONT / APP PROXY ROUTES ---
+
+// 1. Get Wallet Balance
+app.get('/api/wallet/balance', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+    // Get settings
+    const settingsRes = await db.query('SELECT * FROM app_settings WHERE id = 1');
+    const settings = settingsRes.rows[0];
+
+    let balance = 0;
+    let customerName = 'Guest';
+
+    // Sync with Custom API if enabled
+    if (settings.use_custom_api && settings.custom_api_base_url) {
+       try {
+         // Assume custom API takes phone as query param and returns { balance: number, name: string }
+         const apiUrl = `${settings.custom_api_base_url}?phone=${phone}`;
+         const headers = {};
+         if (settings.custom_api_auth_header_key) {
+           headers[settings.custom_api_auth_header_key] = settings.custom_api_auth_header_value;
+         }
+         
+         const apiRes = await fetch(apiUrl, { headers });
+         if (apiRes.ok) {
+           const apiData = await apiRes.json();
+           balance = parseFloat(apiData.balance || 0);
+           customerName = apiData.name || customerName;
+         }
+       } catch (e) {
+         console.error("Custom API Sync Failed:", e);
+         // Fallback to local DB if custom API fails? Or just continue.
+       }
+    }
+
+    // Upsert Wallet in Local DB
+    // We use phone as hash for this demo to ensure uniqueness mapping
+    const phoneHash = phone; 
+    
+    // Check if wallet exists
+    const walletCheck = await db.query('SELECT * FROM wallets WHERE customer_phone = $1', [phone]);
+    
+    if (walletCheck.rows.length > 0) {
+       // Update if custom API provided new data, or just fetch local if no custom API
+       if (settings.use_custom_api) {
+          await db.query('UPDATE wallets SET balance = $1 WHERE customer_phone = $2', [balance, phone]);
+       } else {
+          balance = parseFloat(walletCheck.rows[0].balance);
+       }
+    } else {
+       // Create new wallet
+       await db.query(`
+         INSERT INTO wallets (phone_hash, customer_name, customer_phone, balance)
+         VALUES ($1, $2, $3, $4)
+       `, [phoneHash, customerName, phone, balance]);
+    }
+
+    res.json({
+      success: true,
+      walletCoins: balance,
+      currency: "INR"
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error', success: false });
+  }
+});
+
+// 2. Send OTP
+app.post('/api/otp/send', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone required' });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const sessionId = `OTP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    // Expire in 2 minutes (120 seconds)
+    const expiresAt = new Date(Date.now() + 120 * 1000);
+
+    await db.query(`
+      INSERT INTO otp_sessions (id, phone, otp, expires_at)
+      VALUES ($1, $2, $3, $4)
+    `, [sessionId, phone, otp, expiresAt]);
+
+    // In production: Integrate SMS Provider here (Twilio/AWS)
+    console.log(`[MOCK SMS] OTP for ${phone}: ${otp}`);
+
+    res.json({
+      success: true,
+      otpSessionId: sessionId,
+      expiresIn: 120
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 3. Validate OTP
+app.post('/api/otp/validate', async (req, res) => {
+  try {
+    const { otpSessionId, otp } = req.body;
+    
+    const result = await db.query(`
+      SELECT * FROM otp_sessions 
+      WHERE id = $1 AND otp = $2 AND is_used = FALSE AND expires_at > NOW()
+    `, [otpSessionId, otp]);
+
+    if (result.rows.length > 0) {
+      // Mark as used
+      await db.query('UPDATE otp_sessions SET is_used = TRUE WHERE id = $1', [otpSessionId]);
+      res.json({ success: true, verified: true });
+    } else {
+      res.json({ success: false, message: "Invalid or expired OTP" });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 4. Apply Discount (Mock Shopify)
+app.post('/api/wallet/apply-discount', async (req, res) => {
+  // In a real app, this would make an admin API call to Shopify to create a PriceRule/DiscountCode
+  // Here we just acknowledge and return the code structure expected by the frontend extension.
+  const { discount_code } = req.body;
+  const code = discount_code?.code || `WALLET-DISCOUNT`;
+  
+  res.json({
+    success: true,
+    discountCode: code
+  });
+});
+
+// 5. Deduct Coins (Manual/API)
+app.post('/api/wallet/deduct', async (req, res) => {
+  try {
+    const { phone, orderId, coins } = req.body;
+    const amount = parseFloat(coins);
+
+    const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1', [phone]);
+    if (walletRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Wallet not found' });
+    }
+
+    const wallet = walletRes.rows[0];
+    if (parseFloat(wallet.balance) < amount) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance' });
+    }
+
+    // Deduct
+    const newBalance = parseFloat(wallet.balance) - amount;
+    await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [newBalance, wallet.id]);
+
+    // Log Transaction
+    await db.query(`
+      INSERT INTO transactions (wallet_id, order_id, coins, type, status)
+      VALUES ($1, $2, $3, 'DEBIT', 'COMPLETED')
+    `, [wallet.id, orderId || 'MANUAL', amount]);
+
+    res.json({
+      success: true,
+      remainingCoins: newBalance
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// 6. Webhook: Orders Paid
+app.post('/webhooks/orders/paid', async (req, res) => {
+  try {
+    const order = req.body;
+    console.log("Processing Order Webhook:", order.id);
+
+    // Check for wallet discount codes
+    // Format assumed: WALLET-9999999999
+    const discountCodes = order.discount_codes || [];
+    const walletCode = discountCodes.find(c => c.code.startsWith('WALLET-'));
+
+    if (walletCode) {
+      const phone = walletCode.code.replace('WALLET-', '');
+      // Calculate amount to deduct. 
+      // In a real scenario, we need to know exactly how much the discount was worth.
+      // Shopify payload: discount_codes: [{ code: '...', amount: '10.00', type: 'fixed_amount' }]
+      const amount = parseFloat(walletCode.amount || 0);
+
+      if (amount > 0) {
+        // Find Wallet
+        const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1', [phone]);
+        if (walletRes.rows.length > 0) {
+           const wallet = walletRes.rows[0];
+           
+           // Check if transaction already exists (Idempotency)
+           const txnCheck = await db.query('SELECT * FROM transactions WHERE order_id = $1 AND type = \'DEBIT\'', [order.id.toString()]);
+           
+           if (txnCheck.rows.length === 0) {
+              const newBalance = parseFloat(wallet.balance) - amount;
+              // Allow negative? Probably not, but if Shopify applied discount, we must deduct.
+              // We'll update regardless to stay in sync.
+              await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [newBalance, wallet.id]);
+              
+              await db.query(`
+                INSERT INTO transactions (wallet_id, order_id, coins, type, status, order_amount)
+                VALUES ($1, $2, $3, 'DEBIT', 'COMPLETED', $4)
+              `, [wallet.id, order.id.toString(), amount, parseFloat(order.total_price)]);
+              
+              console.log(`Deducted ${amount} coins from ${phone} for order ${order.id}`);
+           } else {
+              console.log(`Transaction already processed for order ${order.id}`);
+           }
+        }
+      }
+    }
+
+    res.status(200).send('Webhook processed');
+  } catch (err) {
+    console.error("Webhook Error:", err);
+    res.status(500).send('Error');
   }
 });
 
