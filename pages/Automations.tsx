@@ -11,7 +11,8 @@ import {
   List,
   TrendingUp,
   CheckCircle2,
-  Send
+  Send,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -325,80 +326,94 @@ const Automations: React.FC = () => {
 
       {/* Modal Overlay */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in relative">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                  <h2 className="text-lg font-bold text-slate-900">Create Automation Job</h2>
-                 <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                    &times;
+                 <button 
+                    onClick={() => setShowModal(false)} 
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-all"
+                 >
+                    <X className="h-5 w-5" />
                  </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-5">
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Job Name</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Job Name</label>
                     <input 
                         type="text" 
                         value={newJob.name}
                         onChange={(e) => setNewJob({...newJob, name: e.target.value})}
-                        className="w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm"
+                        className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm shadow-sm"
                         placeholder="e.g. Monthly Expiry Warning"
                     />
                  </div>
                  
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Trigger Condition</label>
-                    <select 
-                        value={newJob.condition_type}
-                        onChange={(e) => setNewJob({...newJob, condition_type: e.target.value as any})}
-                        className="w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border bg-white text-sm"
-                    >
-                        <option value="EXPIRY_WARNING">Points Expiring In (Days)</option>
-                        <option value="LOW_BALANCE">Balance Below (Coins)</option>
-                        <option value="INACTIVE_USER">Inactive For (Days)</option>
-                    </select>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Trigger Condition</label>
+                    <div className="relative">
+                        <select 
+                            value={newJob.condition_type}
+                            onChange={(e) => setNewJob({...newJob, condition_type: e.target.value as any})}
+                            className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border bg-white text-sm shadow-sm appearance-none"
+                        >
+                            <option value="EXPIRY_WARNING">Points Expiring In (Days)</option>
+                            <option value="LOW_BALANCE">Balance Below (Coins)</option>
+                            <option value="INACTIVE_USER">Inactive For (Days)</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                           <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                        </div>
+                    </div>
                  </div>
 
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Condition Value</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Condition Value</label>
                     <input 
                         type="number" 
                         value={newJob.condition_value}
                         onChange={(e) => setNewJob({...newJob, condition_value: parseInt(e.target.value) || 0})}
-                        className="w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm"
+                        className="block w-full rounded-lg border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-2.5 border text-sm shadow-sm"
                     />
                  </div>
 
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Notification Channel</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Notification Channel</label>
                     <div className="grid grid-cols-2 gap-3">
-                        <label className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${newJob.action_channel === 'SMS' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                        <label className={`relative flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${newJob.action_channel === 'SMS' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
                             <input 
                                 type="radio" 
                                 name="channel" 
                                 checked={newJob.action_channel === 'SMS'}
                                 onChange={() => setNewJob({...newJob, action_channel: 'SMS'})}
-                                className="hidden"
+                                className="sr-only"
                             />
-                            <Smartphone className="h-4 w-4" />
+                            <Smartphone className={`h-5 w-5 ${newJob.action_channel === 'SMS' ? 'text-emerald-600' : 'text-slate-400'}`} />
                             <span className="text-sm font-medium">SMS</span>
+                            {newJob.action_channel === 'SMS' && (
+                                <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-500"></div>
+                            )}
                         </label>
-                        <label className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${newJob.action_channel === 'WHATSAPP' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                        <label className={`relative flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${newJob.action_channel === 'WHATSAPP' ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
                             <input 
                                 type="radio" 
                                 name="channel" 
                                 checked={newJob.action_channel === 'WHATSAPP'}
                                 onChange={() => setNewJob({...newJob, action_channel: 'WHATSAPP'})}
-                                className="hidden"
+                                className="sr-only"
                             />
-                            <MessageSquare className="h-4 w-4" />
+                            <MessageSquare className={`h-5 w-5 ${newJob.action_channel === 'WHATSAPP' ? 'text-emerald-600' : 'text-slate-400'}`} />
                             <span className="text-sm font-medium">WhatsApp</span>
+                            {newJob.action_channel === 'WHATSAPP' && (
+                                <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-500"></div>
+                            )}
                         </label>
                     </div>
                  </div>
               </div>
               <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                 <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors">Cancel</button>
-                 <button onClick={handleCreate} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">Create Job</button>
+                 <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/50 rounded-lg transition-colors">Cancel</button>
+                 <button onClick={handleCreate} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-600/20">Create Job</button>
               </div>
            </div>
         </div>
