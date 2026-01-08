@@ -1,6 +1,6 @@
 import { Wallet, Transaction, AppSettings, DashboardStats, CustomerSummary, AutomationJob, AutomationAnalytics, PaginatedResponse } from '../types';
 
-const DEFAULT_API_BASE = '/api';
+const DEFAULT_API_BASE = 'http://localhost:30001/api';
 const STORAGE_KEY = 'shopwallet_api_config';
 
 // --- API CLIENT ---
@@ -8,22 +8,11 @@ const STORAGE_KEY = 'shopwallet_api_config';
 const getActiveConfig = (): { baseUrl: string; headers: Record<string, string> } => {
   let baseUrl = DEFAULT_API_BASE;
   let headers: Record<string, string> = {};
-
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const settings = JSON.parse(stored) as AppSettings;
-      if (settings.useCustomApi && settings.customApiConfig?.baseUrl) {
-        baseUrl = settings.customApiConfig.baseUrl.replace(/\/$/, '');
-        if (settings.customApiConfig.authHeaderKey) {
-          headers[settings.customApiConfig.authHeaderKey] = settings.customApiConfig.authHeaderValue;
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to load API settings from local storage", e);
-  }
-
+  
+  // Note: For the main API calls to *our* backend, we don't change the base URL 
+  // based on the custom API settings anymore, because the backend now proxies the request.
+  // We keep the logic simple to always point to our backend.
+  
   return { baseUrl, headers };
 };
 
@@ -102,7 +91,6 @@ export const api = {
   // --- SETTINGS ---
   getSettings: async (): Promise<AppSettings> => {
     const settings = await request<AppSettings>('/settings');
-    // Sync local storage so subsequent requests use the correct API config if custom API is enabled
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     return settings;
   },
@@ -114,6 +102,14 @@ export const api = {
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     return updated;
+  },
+
+  // Test the custom API integration via our backend proxy
+  testIntegration: async (config: { url: string; authKey: string; authValue: string; testPhone: string }) => {
+    return request<{ success: boolean; data?: any; message?: string }>('/settings/test-integration', {
+      method: 'POST',
+      body: JSON.stringify(config)
+    });
   },
 
   // --- CUSTOMERS ---

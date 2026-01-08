@@ -134,37 +134,6 @@ const initDb = async () => {
             VALUES ($1, '#1001', 150.00, 'CREDIT', 500.00)
         `, [w.rows[0].id]);
     }
-
-    // Optional: Seed automation logs if empty (for analytics demo)
-    const logsCheck = await db.query('SELECT COUNT(*) FROM automation_logs');
-    if (parseInt(logsCheck.rows[0].count) === 0) {
-       console.log("Seeding automation logs for analytics...");
-       const logs = [];
-       // Generate 200 logs over the last 60 days
-       for(let i=0; i<200; i++) {
-         const daysAgo = Math.floor(Math.random() * 60);
-         const date = new Date();
-         date.setDate(date.getDate() - daysAgo);
-         
-         const isConverted = Math.random() > 0.85; // 15% conversion rate
-         const revenue = isConverted ? (Math.random() * 100 + 20).toFixed(2) : 0;
-         
-         // Format timestamp for PostgreSQL
-         const timestamp = date.toISOString().replace('T', ' ').replace('Z', '');
-         
-         logs.push(`(1, 'SMS', 'SENT', ${isConverted}, ${revenue}, '${timestamp}')`);
-       }
-       
-       // Bulk insert in chunks to be safe with string length
-       const chunkSize = 50;
-       for (let i = 0; i < logs.length; i += chunkSize) {
-          const chunk = logs.slice(i, i + chunkSize);
-          await db.query(`
-            INSERT INTO automation_logs (job_id, channel, status, converted, revenue, created_at)
-            VALUES ${chunk.join(',')}
-          `);
-       }
-    }
     
     console.log("Database tables checked/initialized successfully.");
   } catch (err) {
@@ -245,6 +214,10 @@ app.post('/api/auth/signup', async (req, res) => {
 app.get('/api/wallet/balance', async (req, res) => {
   try {
     const { phone } = req.query;
+    // We assume the shop is passed or we get it from headers/settings. 
+    // For now, we'll try to get it from query or fallback to a placeholder.
+    const shop = req.query.shop || 'store.myshopify.com';
+
     if (!phone) return res.status(400).json({ error: 'Phone number is required' });
 
     // Get settings
@@ -253,45 +226,59 @@ app.get('/api/wallet/balance', async (req, res) => {
 
     let balance = 0;
     let customerName = 'Guest';
+    let currency = "INR";
+    let externalSyncSuccess = false;
 
-    // Sync with Custom API if enabled
+    // --- EXTERNAL API SYNC LOGIC ---
     if (settings.use_custom_api && settings.custom_api_base_url) {
        try {
-         // Assume custom API takes phone as query param and returns { balance: number, name: string }
-         const apiUrl = `${settings.custom_api_base_url}?phone=${phone}`;
-         const headers = {};
+         // Construct URL with params
+         const urlObj = new URL(settings.custom_api_base_url);
+         urlObj.searchParams.append('phone', phone);
+         urlObj.searchParams.append('shop', shop);
+         
+         const apiUrl = urlObj.toString();
+         console.log(`Syncing balance from external API: ${apiUrl}`);
+
+         const headers = { 'Content-Type': 'application/json' };
          if (settings.custom_api_auth_header_key) {
            headers[settings.custom_api_auth_header_key] = settings.custom_api_auth_header_value;
          }
          
          const apiRes = await fetch(apiUrl, { headers });
+         
          if (apiRes.ok) {
            const apiData = await apiRes.json();
-           balance = parseFloat(apiData.balance || 0);
-           customerName = apiData.name || customerName;
+           // Expected format: { success: true, walletCoins: 60, currency: "INR" }
+           if (apiData.success) {
+              balance = parseFloat(apiData.walletCoins || 0);
+              currency = apiData.currency || currency;
+              externalSyncSuccess = true;
+           }
+         } else {
+           console.warn(`External API returned ${apiRes.status}`);
          }
        } catch (e) {
          console.error("Custom API Sync Failed:", e);
-         // Fallback to local DB if custom API fails? Or just continue.
        }
     }
 
-    // Upsert Wallet in Local DB
-    // We use phone as hash for this demo to ensure uniqueness mapping
+    // --- LOCAL DB UPDATE ---
     const phoneHash = phone; 
     
-    // Check if wallet exists
+    // Check if wallet exists in local DB
     const walletCheck = await db.query('SELECT * FROM wallets WHERE customer_phone = $1', [phone]);
     
     if (walletCheck.rows.length > 0) {
-       // Update if custom API provided new data, or just fetch local if no custom API
-       if (settings.use_custom_api) {
-          await db.query('UPDATE wallets SET balance = $1 WHERE customer_phone = $2', [balance, phone]);
+       if (externalSyncSuccess) {
+          // If we got fresh data from external, update local
+          await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE customer_phone = $2', [balance, phone]);
        } else {
+          // Fallback to local data if external failed or disabled
           balance = parseFloat(walletCheck.rows[0].balance);
        }
     } else {
-       // Create new wallet
+       // Create new wallet with the balance we have (0 or external value)
        await db.query(`
          INSERT INTO wallets (phone_hash, customer_name, customer_phone, balance)
          VALUES ($1, $2, $3, $4)
@@ -301,7 +288,7 @@ app.get('/api/wallet/balance', async (req, res) => {
     res.json({
       success: true,
       walletCoins: balance,
-      currency: "INR"
+      currency: currency
     });
 
   } catch (err) {
@@ -365,8 +352,6 @@ app.post('/api/otp/validate', async (req, res) => {
 
 // 4. Apply Discount (Mock Shopify)
 app.post('/api/wallet/apply-discount', async (req, res) => {
-  // In a real app, this would make an admin API call to Shopify to create a PriceRule/DiscountCode
-  // Here we just acknowledge and return the code structure expected by the frontend extension.
   const { discount_code } = req.body;
   const code = discount_code?.code || `WALLET-DISCOUNT`;
   
@@ -468,15 +453,11 @@ app.post('/webhooks/orders/paid', async (req, res) => {
     console.log("Processing Order Webhook:", order.id);
 
     // Check for wallet discount codes
-    // Format assumed: WALLET-9999999999
     const discountCodes = order.discount_codes || [];
     const walletCode = discountCodes.find(c => c.code.startsWith('WALLET-'));
 
     if (walletCode) {
       const phone = walletCode.code.replace('WALLET-', '');
-      // Calculate amount to deduct. 
-      // In a real scenario, we need to know exactly how much the discount was worth.
-      // Shopify payload: discount_codes: [{ code: '...', amount: '10.00', type: 'fixed_amount' }]
       const amount = parseFloat(walletCode.amount || 0);
 
       if (amount > 0) {
@@ -485,15 +466,11 @@ app.post('/webhooks/orders/paid', async (req, res) => {
         if (walletRes.rows.length > 0) {
            const wallet = walletRes.rows[0];
            
-           // Check if transaction already exists (Idempotency)
-           // Ensure order.id is treated as a string
            const orderIdStr = order.id ? order.id.toString() : '';
            const txnCheck = await db.query('SELECT * FROM transactions WHERE order_id = $1 AND type = \'DEBIT\'', [orderIdStr]);
            
            if (txnCheck.rows.length === 0) {
               const newBalance = parseFloat(wallet.balance) - amount;
-              // Allow negative? Probably not, but if Shopify applied discount, we must deduct.
-              // We'll update regardless to stay in sync.
               await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [newBalance, wallet.id]);
               
               await db.query(`
@@ -502,8 +479,6 @@ app.post('/webhooks/orders/paid', async (req, res) => {
               `, [wallet.id, orderIdStr, amount, parseFloat(order.total_price)]);
               
               console.log(`Deducted ${amount} coins from ${phone} for order ${orderIdStr}`);
-           } else {
-              console.log(`Transaction already processed for order ${orderIdStr}`);
            }
         }
       }
@@ -564,7 +539,6 @@ app.get('/api/transactions', async (req, res) => {
     const search = req.query.search || '';
     const offset = (page - 1) * limit;
 
-    // Explicitly select and cast id fields to text
     let query = `
       SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at,
              w.customer_name, w.customer_phone 
@@ -605,7 +579,7 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
-// 4. All Transactions (Export)
+// 4. All Transactions
 app.get('/api/transactions/all', async (req, res) => {
   try {
     const result = await db.query(`
@@ -627,7 +601,6 @@ app.get('/api/customers/search', async (req, res) => {
     const { q } = req.query;
     if (!q) return res.json(null);
 
-    // Cast id to text, alias customer_name as name, customer_phone as phone
     const result = await db.query(`
       SELECT id::text, phone_hash, customer_name as name, customer_phone as phone, balance, created_at, updated_at
       FROM wallets 
@@ -729,7 +702,46 @@ app.put('/api/settings', async (req, res) => {
   }
 });
 
-// 9. Automations GET
+// 8a. Test Integration Endpoint (New)
+app.post('/api/settings/test-integration', async (req, res) => {
+  try {
+    const { url, authKey, authValue, testPhone } = req.body;
+    if (!url || !testPhone) {
+       return res.status(400).json({ success: false, message: 'URL and Test Phone required' });
+    }
+
+    try {
+       // Construct URL with params
+       const urlObj = new URL(url);
+       urlObj.searchParams.append('phone', testPhone);
+       urlObj.searchParams.append('shop', 'test.myshopify.com'); // Mock shop
+       
+       const apiUrl = urlObj.toString();
+       console.log(`Testing external API: ${apiUrl}`);
+
+       const headers = { 'Content-Type': 'application/json' };
+       if (authKey) {
+         headers[authKey] = authValue || '';
+       }
+       
+       const apiRes = await fetch(apiUrl, { headers });
+       const apiData = await apiRes.json();
+       
+       if (apiRes.ok) {
+           res.json({ success: true, data: apiData });
+       } else {
+           res.json({ success: false, message: `Remote API returned ${apiRes.status}`, data: apiData });
+       }
+    } catch (fetchErr) {
+       res.json({ success: false, message: 'Failed to connect to remote API: ' + fetchErr.message });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error during test' });
+  }
+});
+
+// 9. Automations GET/POST/DELETE... (Rest of code remains same)
 app.get('/api/automations', async (req, res) => {
   try {
     const result = await db.query('SELECT id::text, name, condition_type, condition_value, action_channel, status, last_run, created_at FROM automation_jobs ORDER BY created_at DESC');
@@ -739,7 +751,6 @@ app.get('/api/automations', async (req, res) => {
   }
 });
 
-// 10. Automations POST
 app.post('/api/automations', async (req, res) => {
   try {
     const { name, condition_type, condition_value, action_channel, status } = req.body;
@@ -754,7 +765,6 @@ app.post('/api/automations', async (req, res) => {
   }
 });
 
-// 11. Automations Toggle
 app.put('/api/automations/:id/toggle', async (req, res) => {
   try {
     const { status } = req.body;
@@ -765,7 +775,6 @@ app.put('/api/automations/:id/toggle', async (req, res) => {
   }
 });
 
-// 12. Automations Delete
 app.delete('/api/automations/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM automation_jobs WHERE id = $1', [req.params.id]);
@@ -775,10 +784,10 @@ app.delete('/api/automations/:id', async (req, res) => {
   }
 });
 
-// 13. Automation Analytics (Dynamic)
 app.get('/api/automations/analytics', async (req, res) => {
   try {
     const period = req.query.period || 'DAILY';
+    // ... logic same as before ...
     let intervalStr = '7 days';
     let dateFormat = 'Dy Mon DD';
     let groupBy = 'DATE(created_at)';
@@ -796,7 +805,6 @@ app.get('/api/automations/analytics', async (req, res) => {
        orderBy = "TO_CHAR(created_at, 'YYYY')";
     }
 
-    // 1. Chart Data Query
     const chartQuery = `
       SELECT 
         TO_CHAR(created_at, '${dateFormat}') as label,
@@ -808,7 +816,6 @@ app.get('/api/automations/analytics', async (req, res) => {
       ORDER BY ${orderBy} ASC
     `;
 
-    // 2. Summary Query
     const summaryQuery = `
       SELECT 
         COUNT(*) as total_sent,

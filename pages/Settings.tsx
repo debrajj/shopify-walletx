@@ -1,115 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Save, AlertCircle, Database, Server, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Save, AlertCircle, Database, Server, CheckCircle2, ShieldAlert, Play, RefreshCw, Copy } from 'lucide-react';
 import Toggle from '../components/Toggle';
 import { api } from '../services/api';
 import { AppSettings } from '../types';
-import { ApiContractViewer, PageContract } from '../components/ApiContractViewer.tsx';
-
-// --- API Contracts Definition ---
-const API_CONTRACTS: PageContract[] = [
-  {
-    pageName: "Dashboard",
-    endpoints: [
-      {
-        method: "GET",
-        path: "/stats",
-        description: "Fetch aggregate statistics for dashboard cards.",
-        responseBody: {
-          totalWallets: 1245,
-          totalCoinsInCirculation: 45200,
-          totalTransactionsToday: 84,
-          otpSuccessRate: 98.2
-        }
-      },
-      {
-        method: "GET",
-        path: "/revenue",
-        description: "Fetch revenue/usage data for the area chart.",
-        responseBody: [
-          { name: "Mon", value: 4000 },
-          { name: "Tue", value: 3000 }
-        ]
-      }
-    ]
-  },
-  {
-    pageName: "Transactions (Paginated)",
-    endpoints: [
-      {
-        method: "GET",
-        path: "/transactions?page={page}&limit={limit}&search={query}",
-        description: "Fetch paginated transaction history.",
-        responseBody: {
-          data: [
-             { id: "TXN-1", order_id: "#1001", customer_name: "Alice", coins: 100, type: "CREDIT", created_at: "2023-10-01" }
-          ],
-          meta: {
-             current_page: 1,
-             last_page: 5,
-             total: 50,
-             per_page: 10
-          }
-        }
-      }
-    ]
-  },
-  {
-    pageName: "Customers",
-    endpoints: [
-      {
-        method: "GET",
-        path: "/customers/search?q={query}",
-        description: "Search for a customer by phone or name.",
-        responseBody: {
-          id: "CUST-123",
-          name: "Alice Smith",
-          phone: "+1 (555) 000-1000",
-          balance: 1540,
-          total_orders: 12,
-          total_spent: 3450.50,
-          total_coins_used: 450
-        }
-      },
-      {
-        method: "GET",
-        path: "/customers/{id}/transactions",
-        description: "Get transaction history for a specific customer.",
-        responseBody: [
-           { id: "TXN-1", coins: 50, type: "CREDIT", status: "COMPLETED", created_at: "2023-10-01T12:00:00Z" }
-        ]
-      }
-    ]
-  },
-  {
-    pageName: "Automations & Analytics",
-    endpoints: [
-      {
-        method: "GET",
-        path: "/automations",
-        description: "List all scheduled automation jobs.",
-        responseBody: [
-           { id: "JOB-1", name: "Expiry Warning", condition_type: "EXPIRY_WARNING", status: "ACTIVE" }
-        ]
-      },
-      {
-        method: "GET",
-        path: "/automations/analytics?period={DAILY|MONTHLY}",
-        description: "Fetch performance metrics for automations tab.",
-        responseBody: {
-          summary: {
-             totalSent: 1500,
-             totalConverted: 300,
-             conversionRate: 20.0,
-             revenueGenerated: 12000
-          },
-          chartData: [
-             { label: "Mon", sent: 100, converted: 20 }
-          ]
-        }
-      }
-    ]
-  }
-];
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -117,6 +10,11 @@ const Settings: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   const [activeTab, setActiveTab] = useState<'GENERAL' | 'API'>('GENERAL');
+  
+  // Test Tool State
+  const [testPhone, setTestPhone] = useState('9999999999');
+  const [testResult, setTestResult] = useState<{success: boolean; data?: any; message?: string} | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -152,6 +50,25 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleTestConnection = async () => {
+    if (!settings?.customApiConfig.baseUrl || !testPhone) return;
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const result = await api.testIntegration({
+        url: settings.customApiConfig.baseUrl,
+        authKey: settings.customApiConfig.authHeaderKey,
+        authValue: settings.customApiConfig.authHeaderValue,
+        testPhone: testPhone
+      });
+      setTestResult(result);
+    } catch (err: any) {
+      setTestResult({ success: false, message: err.message || 'Connection failed' });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   if (loading || !settings) {
     return (
       <div className="flex h-full items-center justify-center min-h-[400px]">
@@ -159,6 +76,12 @@ const Settings: React.FC = () => {
       </div>
     );
   }
+
+  const expectedResponse = {
+    "success": true,
+    "walletCoins": 60,
+    "currency": "INR"
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
@@ -221,7 +144,7 @@ const Settings: React.FC = () => {
             }`}
           >
             <Server className="h-4 w-4" />
-            Custom API Integration
+            Wallet Balance API
           </button>
         </div>
       </div>
@@ -328,8 +251,10 @@ const Settings: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Custom API Configuration</h2>
-                  <p className="text-sm text-slate-500 mt-1">Connect the admin panel to your own backend.</p>
+                  <h2 className="text-lg font-semibold text-slate-900">External Wallet Balance Sync</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Connect an external system to fetch the master balance for customers.
+                  </p>
                </div>
                <div className="flex items-center gap-3">
                  <span className={`text-sm font-medium ${settings.useCustomApi ? 'text-emerald-600' : 'text-slate-500'}`}>
@@ -345,23 +270,25 @@ const Settings: React.FC = () => {
             
             <div className={`p-6 space-y-6 transition-all duration-300 ${!settings.useCustomApi ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
               <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-2">Base URL</label>
+                 <label className="block text-sm font-medium text-slate-700 mb-2">Wallet Balance API URL</label>
                  <div className="flex rounded-md shadow-sm">
                     <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-slate-300 bg-slate-50 text-slate-500 sm:text-sm">
-                      https://
+                      URL
                     </span>
                     <input 
                       type="text" 
-                      placeholder="api.yourdomain.com/v1"
-                      value={settings.customApiConfig.baseUrl.replace('https://', '')}
+                      placeholder="https://api.yourdomain.com/v1/wallet/balance"
+                      value={settings.customApiConfig.baseUrl}
                       onChange={(e) => setSettings({
                         ...settings,
-                        customApiConfig: { ...settings.customApiConfig, baseUrl: `https://${e.target.value.replace('https://', '')}` }
+                        customApiConfig: { ...settings.customApiConfig, baseUrl: e.target.value }
                       })}
                       className="flex-1 min-w-0 block w-full px-3 py-2.5 rounded-none rounded-r-md border border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                     />
                  </div>
-                 <p className="mt-1.5 text-xs text-slate-500">The root URL for all endpoints defined in the spec.</p>
+                 <p className="mt-1.5 text-xs text-slate-500">
+                    We will make a GET request to this URL with query parameters: <code>?phone=XXXXXXXXXX&shop=store.myshopify.com</code>
+                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -395,18 +322,82 @@ const Settings: React.FC = () => {
             </div>
           </div>
 
-          {/* Integration Guide / Specs */}
-          <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-             <div className="p-6 border-b border-slate-200">
-                <h2 className="text-lg font-bold text-slate-900">Integration Guide</h2>
-                <p className="text-sm text-slate-600 mt-2">
-                   To successfully integrate, your backend must implement the following endpoints. 
-                   Ensure the request/response structure matches exactly.
-                </p>
-             </div>
-             <div className="p-6">
-                <ApiContractViewer contracts={API_CONTRACTS} />
-             </div>
+          {/* Test Tool & Documentation Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Documentation */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+               <div className="p-5 border-b border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">Expected API Response</h3>
+                  <p className="text-xs text-slate-500 mt-1">Your API must return exactly this JSON format.</p>
+               </div>
+               <div className="p-5">
+                  <div className="relative group">
+                     <pre className="bg-slate-900 text-emerald-400 p-4 rounded-lg overflow-x-auto text-xs font-mono border border-slate-800 leading-relaxed">
+{JSON.stringify(expectedResponse, null, 2)}
+                     </pre>
+                     <button 
+                       onClick={() => navigator.clipboard.writeText(JSON.stringify(expectedResponse, null, 2))}
+                       className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                       title="Copy JSON"
+                     >
+                       <Copy className="h-3 w-3" />
+                     </button>
+                  </div>
+                  <div className="mt-4 space-y-2 text-xs text-slate-600">
+                    <p>• <strong>success</strong>: Must be true for us to sync.</p>
+                    <p>• <strong>walletCoins</strong>: The current balance (number).</p>
+                    <p>• If the user doesn't exist in our system, we will create them with 0 coins initially, then sync with your API.</p>
+                  </div>
+               </div>
+            </div>
+
+            {/* Test Tool */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+               <div className="p-5 border-b border-slate-200 bg-slate-50/30">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                     <RefreshCw className="h-4 w-4 text-slate-400" />
+                     Test Connection
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">Verify your API is reachable and returning correct data.</p>
+               </div>
+               <div className="p-5 flex-1 flex flex-col">
+                  <div className="mb-4">
+                     <label className="block text-xs font-medium text-slate-700 mb-1.5">Test Phone Number</label>
+                     <input 
+                        type="text" 
+                        value={testPhone}
+                        onChange={(e) => setTestPhone(e.target.value)}
+                        placeholder="9999999999"
+                        className="block w-full rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm py-2 px-3 border"
+                     />
+                  </div>
+
+                  {testResult && (
+                    <div className={`mb-4 p-3 rounded-lg text-xs font-mono border ${testResult.success ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-red-50 border-red-100 text-red-800'}`}>
+                       <p className="font-bold mb-1">{testResult.success ? 'SUCCESS' : 'FAILED'}</p>
+                       <pre className="whitespace-pre-wrap break-all">
+                          {JSON.stringify(testResult.data || testResult.message, null, 2)}
+                       </pre>
+                    </div>
+                  )}
+
+                  <div className="mt-auto">
+                     <button
+                        onClick={handleTestConnection}
+                        disabled={isTesting || !settings?.customApiConfig.baseUrl}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                        {isTesting ? (
+                           <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                           <Play className="h-4 w-4" />
+                        )}
+                        Test Request
+                     </button>
+                  </div>
+               </div>
+            </div>
           </div>
         </div>
       )}
