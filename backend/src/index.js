@@ -391,6 +391,162 @@ app.post('/api/otp/validate', requireStorefrontAuth, async (req, res) => {
   }
 });
 
+// 4. Apply Discount (Storefront/Public)
+app.post('/api/wallet/apply-discount', requireStorefrontAuth, async (req, res) => {
+  const { discount_code } = req.body;
+  // In a real app, validate logic against req.shopUrl settings
+  const code = discount_code?.code || `WALLET-DISCOUNT`;
+  
+  res.json({
+    success: true,
+    discountCode: code
+  });
+});
+
+// 5. Deduct Coins (Storefront/Public)
+app.post('/api/wallet/deduct', requireStorefrontAuth, async (req, res) => {
+  try {
+    const { phone, orderId, coins } = req.body;
+    const shopUrl = req.shopUrl;
+    const amount = parseFloat(coins);
+
+    const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [phone, shopUrl]);
+    if (walletRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Wallet not found' });
+    }
+
+    const wallet = walletRes.rows[0];
+    if (parseFloat(wallet.balance) < amount) {
+      return res.status(400).json({ success: false, message: 'Insufficient balance' });
+    }
+
+    // Deduct
+    const newBalance = parseFloat(wallet.balance) - amount;
+    await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [newBalance, wallet.id]);
+
+    // Log Transaction
+    await db.query(`
+      INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status)
+      VALUES ($1, $2, $3, $4, 'DEBIT', 'COMPLETED')
+    `, [wallet.id, shopUrl, orderId || 'MANUAL', amount]);
+
+    res.json({
+      success: true,
+      remainingCoins: newBalance
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// 6. Credit Coins (Admin Only)
+app.post('/api/wallet/credit', requireAdminAuth, async (req, res) => {
+  try {
+    const { phone, coins, description } = req.body;
+    const shopUrl = req.shopUrl;
+    const amount = parseFloat(coins);
+
+    if (!phone || isNaN(amount)) {
+      return res.status(400).json({ success: false, message: 'Invalid input' });
+    }
+
+    // Check if wallet exists
+    const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [phone, shopUrl]);
+    let walletId;
+    let currentBalance = 0;
+
+    if (walletRes.rows.length === 0) {
+      // Create new wallet
+      const newWallet = await db.query(`
+        INSERT INTO wallets (store_url, phone_hash, customer_name, customer_phone, balance)
+        VALUES ($1, $2, 'Guest', $2, $3)
+        RETURNING id, balance
+      `, [shopUrl, phone, amount]); // phone used as hash for demo
+      walletId = newWallet.rows[0].id;
+      currentBalance = parseFloat(newWallet.rows[0].balance);
+    } else {
+      // Update existing
+      const w = walletRes.rows[0];
+      walletId = w.id;
+      currentBalance = parseFloat(w.balance) + amount;
+      await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [currentBalance, walletId]);
+    }
+
+    // Log Transaction
+    await db.query(`
+      INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status, order_amount)
+      VALUES ($1, $2, $3, $4, 'CREDIT', 'COMPLETED', 0)
+    `, [walletId, shopUrl, description || 'ADMIN_BONUS', amount]);
+
+    res.json({
+      success: true,
+      newBalance: currentBalance
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// 7. Webhook: Orders Paid
+app.post('/webhooks/orders/paid', async (req, res) => {
+  try {
+    const shopDomain = req.headers['x-shopify-shop-domain'];
+    if (!shopDomain) {
+        console.warn('Webhook missing shop domain header');
+        return res.status(200).send('OK'); // Return 200 to Shopify anyway
+    }
+
+    const order = req.body;
+    console.log(`Processing Order Webhook for ${shopDomain}:`, order.id);
+
+    // Verify tenant exists
+    const userCheck = await db.query('SELECT store_url FROM users WHERE store_url = $1', [shopDomain]);
+    if (userCheck.rows.length === 0) {
+         console.warn(`Tenant not found for ${shopDomain}`);
+         return res.status(200).send('OK');
+    }
+
+    // Check for wallet discount codes
+    const discountCodes = order.discount_codes || [];
+    const walletCode = discountCodes.find(c => c.code.startsWith('WALLET-'));
+
+    if (walletCode) {
+      const phone = walletCode.code.replace('WALLET-', ''); // Simple parsing strategy
+      const amount = parseFloat(walletCode.amount || 0);
+
+      if (amount > 0) {
+        // Find Wallet
+        const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [phone, shopDomain]);
+        if (walletRes.rows.length > 0) {
+           const wallet = walletRes.rows[0];
+           
+           const orderIdStr = order.id ? order.id.toString() : '';
+           const txnCheck = await db.query('SELECT * FROM transactions WHERE order_id = $1 AND type = \'DEBIT\' AND store_url = $2', [orderIdStr, shopDomain]);
+           
+           if (txnCheck.rows.length === 0) {
+              const newBalance = parseFloat(wallet.balance) - amount;
+              await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [newBalance, wallet.id]);
+              
+              await db.query(`
+                INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status, order_amount)
+                VALUES ($1, $2, $3, $4, 'DEBIT', 'COMPLETED', $5)
+              `, [wallet.id, shopDomain, orderIdStr, amount, parseFloat(order.total_price)]);
+              
+              console.log(`Deducted ${amount} coins from ${phone} for order ${orderIdStr}`);
+           }
+        }
+      }
+    }
+
+    res.status(200).send('Webhook processed');
+  } catch (err) {
+    console.error("Webhook Error:", err);
+    res.status(500).send('Error');
+  }
+});
+
 
 // --- ADMIN APIS (Scoped by User's Store) ---
 // Note: In real setup, frontend sends Authorization header. Here we assume req.shopUrl is populated by requireAdminAuth
@@ -413,6 +569,26 @@ app.get('/api/stats', requireAdminAuth, async (req, res) => {
   }
 });
 
+// Revenue Data for Chart
+app.get('/api/revenue', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    const result = await db.query(`
+      SELECT TO_CHAR(created_at, 'Dy') as name, SUM(coins) as value
+      FROM transactions 
+      WHERE store_url = $1 AND type = 'DEBIT' AND created_at >= NOW() - INTERVAL '7 DAYS'
+      GROUP BY TO_CHAR(created_at, 'Dy'), DATE(created_at)
+      ORDER BY DATE(created_at)
+    `, [shopUrl]);
+    
+    const data = result.rows.length > 0 ? result.rows : [];
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Paginated Transactions
 app.get('/api/transactions', requireAdminAuth, async (req, res) => {
   try {
     const shopUrl = req.shopUrl;
@@ -462,6 +638,25 @@ app.get('/api/transactions', requireAdminAuth, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// All Transactions (for reports)
+app.get('/api/transactions/all', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    // Limit to 1000 for safety
+    const result = await db.query(`
+      SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at, 
+             w.customer_name, w.customer_phone 
+      FROM transactions t
+      JOIN wallets w ON t.wallet_id = w.id
+      WHERE t.store_url = $1
+      ORDER BY t.created_at DESC LIMIT 1000
+    `, [shopUrl]);
+    res.json(result.rows);
+  } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -583,6 +778,146 @@ app.get('/api/customers/search', requireAdminAuth, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Customer Transactions
+app.get('/api/customers/:id/transactions', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    const { id } = req.params;
+    
+    const result = await db.query(`
+      SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at,
+             w.customer_name, w.customer_phone
+      FROM transactions t
+      JOIN wallets w ON t.wallet_id = w.id
+      WHERE t.store_url = $1 AND (w.id::text = $2 OR w.customer_phone = $2)
+      ORDER BY t.created_at DESC
+    `, [shopUrl, id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- AUTOMATION ENDPOINTS ---
+
+app.get('/api/automations', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    const result = await db.query('SELECT id::text, name, condition_type, condition_value, action_channel, status, last_run, created_at FROM automation_jobs WHERE store_url = $1 ORDER BY created_at DESC', [shopUrl]);
+    res.json(result.rows);
+  } catch (err) {
+    res.json([]);
+  }
+});
+
+app.post('/api/automations', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    const { name, condition_type, condition_value, action_channel, status } = req.body;
+    const result = await db.query(`
+      INSERT INTO automation_jobs (store_url, name, condition_type, condition_value, action_channel, status)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id::text, name, condition_type, condition_value, action_channel, status, last_run, created_at
+    `, [shopUrl, name, condition_type, condition_value, action_channel, status]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/automations/:id', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    await db.query('DELETE FROM automation_jobs WHERE id = $1 AND store_url = $2', [req.params.id, shopUrl]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/automations/:id/toggle', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    const { status } = req.body;
+    await db.query('UPDATE automation_jobs SET status = $1 WHERE id = $2 AND store_url = $3', [status, req.params.id, shopUrl]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/automations/analytics', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    const period = req.query.period || 'DAILY';
+    
+    let intervalStr = '7 days';
+    let dateFormat = 'Dy Mon DD';
+    let groupBy = 'DATE(created_at)';
+    let orderBy = 'DATE(created_at)';
+    
+    if (period === 'MONTHLY') {
+       intervalStr = '12 months';
+       dateFormat = 'Mon YYYY';
+       groupBy = "TO_CHAR(created_at, 'YYYY-MM')";
+       orderBy = "TO_CHAR(created_at, 'YYYY-MM')";
+    } else if (period === 'YEARLY') {
+       intervalStr = '5 years';
+       dateFormat = 'YYYY';
+       groupBy = "TO_CHAR(created_at, 'YYYY')";
+       orderBy = "TO_CHAR(created_at, 'YYYY')";
+    }
+
+    const chartQuery = `
+      SELECT 
+        TO_CHAR(created_at, '${dateFormat}') as label,
+        COUNT(*) as sent,
+        COUNT(CASE WHEN converted THEN 1 END) as converted
+      FROM automation_logs
+      WHERE store_url = $1 AND created_at >= NOW() - INTERVAL '${intervalStr}'
+      GROUP BY 1, ${groupBy}
+      ORDER BY ${orderBy} ASC
+    `;
+
+    const summaryQuery = `
+      SELECT 
+        COUNT(*) as total_sent,
+        COUNT(CASE WHEN converted THEN 1 END) as total_converted,
+        SUM(revenue) as revenue
+      FROM automation_logs
+      WHERE store_url = $1 AND created_at >= NOW() - INTERVAL '${intervalStr}'
+    `;
+
+    const [chartRes, summaryRes] = await Promise.all([
+       db.query(chartQuery, [shopUrl]),
+       db.query(summaryQuery, [shopUrl])
+    ]);
+
+    const s = summaryRes.rows[0];
+    const totalSent = parseInt(s.total_sent || 0);
+    const totalConverted = parseInt(s.total_converted || 0);
+    const revenue = parseFloat(s.revenue || 0);
+
+    res.json({
+      summary: {
+        totalSent,
+        totalConverted,
+        conversionRate: totalSent > 0 ? parseFloat(((totalConverted / totalSent) * 100).toFixed(1)) : 0,
+        revenueGenerated: revenue
+      },
+      chartData: chartRes.rows.map(r => ({
+        label: r.label,
+        sent: parseInt(r.sent),
+        converted: parseInt(r.converted)
+      }))
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching analytics' });
   }
 });
 
