@@ -1,6 +1,6 @@
 import { Wallet, Transaction, AppSettings, DashboardStats, CustomerSummary, AutomationJob, AutomationAnalytics, PaginatedResponse } from '../types';
 
-const DEFAULT_API_BASE = 'http://localhost:3000/api';
+const DEFAULT_API_BASE = '/api';
 const STORAGE_KEY = 'shopwallet_api_config';
 
 // --- API CLIENT ---
