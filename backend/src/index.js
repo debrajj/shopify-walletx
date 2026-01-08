@@ -47,6 +47,34 @@ const initDb = async () => {
       );
     `);
 
+    // --- MIGRATION: Fix for 500 Error on Settings Update ---
+    // If table existed with old column name, rename it.
+    try {
+      const checkOldCol = await db.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='app_settings' AND column_name='custom_api_base_url'
+      `);
+      if (checkOldCol.rows.length > 0) {
+        console.log("Migrating DB: Renaming custom_api_base_url to custom_api_wallet_balance_url...");
+        await db.query(`ALTER TABLE app_settings RENAME COLUMN custom_api_base_url TO custom_api_wallet_balance_url`);
+      }
+
+      // Ensure new column exists if table was created long ago without it
+      const checkNewCol = await db.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='app_settings' AND column_name='custom_api_wallet_balance_url'
+      `);
+      if (checkNewCol.rows.length === 0) {
+         console.log("Migrating DB: Adding custom_api_wallet_balance_url column...");
+         await db.query(`ALTER TABLE app_settings ADD COLUMN custom_api_wallet_balance_url VARCHAR(255) DEFAULT ''`);
+      }
+    } catch (migErr) {
+      console.warn("Migration step warning (can be ignored if DB is fresh):", migErr.message);
+    }
+    // -------------------------------------------------------
+
     // 3. Wallets Table
     await db.query(`
       CREATE TABLE IF NOT EXISTS wallets (
@@ -679,6 +707,10 @@ app.get('/api/settings', async (req, res) => {
 app.put('/api/settings', async (req, res) => {
   try {
     const s = req.body;
+    
+    // Ensure the column exists before updating to avoid 500 error if migration failed
+    // (Though initDb handles this, this is a safety check)
+    
     await db.query(`
       UPDATE app_settings SET
         is_wallet_enabled = $1,
@@ -699,7 +731,8 @@ app.put('/api/settings', async (req, res) => {
     ]);
     res.json(s);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error updating settings:", err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
