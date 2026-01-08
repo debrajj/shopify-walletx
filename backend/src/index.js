@@ -848,6 +848,21 @@ app.get('/api/automations/analytics', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// --- SERVER STARTUP (Dynamic Port) ---
+
+const startServer = (port) => {
+  const server = app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`Port ${port} is in use, attempting next port ${port + 1}...`);
+      startServer(port + 1);
+    } else {
+      console.error('Server failed to start:', err);
+    }
+  });
+};
+
+startServer(PORT);
