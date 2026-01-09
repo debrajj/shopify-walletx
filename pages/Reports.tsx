@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Filter, Download, Calendar, ArrowRight } from 'lucide-react';
+import { Filter, Download } from 'lucide-react';
 import TransactionTable from '../components/TransactionTable';
 import { api } from '../services/api';
 import { Transaction } from '../types';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { HashRouter, Routes, Route, NavLink, useLocation, Navigate, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings as SettingsIcon, Wallet, BarChart3, Users, Clock, Bell, ChevronDown, LogOut } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings as SettingsIcon, Wallet, BarChart3, Users, Clock, ChevronDown, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { config } from './config/env';
 

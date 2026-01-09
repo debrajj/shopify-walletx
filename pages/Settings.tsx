@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Save, AlertCircle, Database, Server, CheckCircle2, ShieldAlert, Play, RefreshCw, Copy } from 'lucide-react';
+import { Save, Database, Server, CheckCircle2, ShieldAlert, Play, RefreshCw, Copy } from 'lucide-react';
 import Toggle from '../components/Toggle';
 import { api } from '../services/api';
 import { AppSettings } from '../types';

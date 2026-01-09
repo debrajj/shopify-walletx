@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Wallet, 
   Coins, 
   CreditCard, 
   Activity, 
-  TrendingUp,
   Users,
   ArrowRight,
   X,
