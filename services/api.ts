@@ -1,7 +1,8 @@
-import { Wallet, Transaction, AppSettings, DashboardStats, CustomerSummary, AutomationJob, AutomationAnalytics, PaginatedResponse } from '../types';
+import { Transaction, AppSettings, DashboardStats, CustomerSummary, AutomationJob, AutomationAnalytics, PaginatedResponse } from '../types';
+import { config } from '../config/env';
 
-const DEFAULT_API_BASE = '/api';
-const STORAGE_KEY = 'shopwallet_api_config';
+const DEFAULT_API_BASE = config.api.baseUrl;
+const STORAGE_KEY = config.storage.apiConfigKey;
 
 // --- API CLIENT ---
 
@@ -10,7 +11,7 @@ const getActiveConfig = (): { baseUrl: string; headers: Record<string, string> }
   let headers: Record<string, string> = {};
   
   // Extract shop URL from logged-in user to send as header for tenant identification in Admin API
-  const userStr = localStorage.getItem('shopwallet_user');
+  const userStr = localStorage.getItem(config.storage.userKey);
   if (userStr) {
     try {
       const user = JSON.parse(userStr);
@@ -38,7 +39,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  const data = await response.json();
+  // Check if response has content before trying to parse JSON
+  const text = await response.text();
+  let data;
+  
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (jsonError) {
+    throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+  }
 
   if (!response.ok) {
     throw new Error(data.error || `Server returned ${response.status}`);
@@ -51,14 +60,14 @@ export const api = {
   // --- AUTHENTICATION ---
   auth: {
     login: async (email: string, password: string) => {
-      return request<{ user: any }>('/auth/login', {
+      return await request<{ user: any }>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password })
       });
     },
-    // Updated Signup Signature
+    
     signup: async (data: { name: string; email: string; password: string; storeName: string; storeUrl: string; shopifyAccessToken: string; shopifyApiKey: string }) => {
-      return request<{ user: any }>('/auth/signup', {
+      return await request<{ user: any }>('/auth/signup', {
         method: 'POST',
         body: JSON.stringify(data)
       });
@@ -67,11 +76,11 @@ export const api = {
 
   // --- DASHBOARD ---
   getStats: async (): Promise<DashboardStats> => {
-    return request<DashboardStats>('/stats');
+    return await request<DashboardStats>('/stats');
   },
 
   getRevenueData: async (): Promise<{ name: string; value: number }[]> => {
-    return request<{ name: string; value: number }[]>('/revenue');
+    return await request<{ name: string; value: number }[]>('/revenue');
   },
 
   // --- TRANSACTIONS ---
@@ -81,11 +90,12 @@ export const api = {
       limit: params.limit.toString(),
       search: params.search || ''
     });
-    return request<PaginatedResponse<Transaction>>(`/transactions?${query.toString()}`);
+    
+    return await request<PaginatedResponse<Transaction>>(`/transactions?${query.toString()}`);
   },
 
   getAllTransactions: async (): Promise<Transaction[]> => {
-    return request<Transaction[]>('/transactions/all');
+    return await request<Transaction[]>('/transactions/all');
   },
 
   // --- SETTINGS ---
@@ -105,7 +115,7 @@ export const api = {
   },
 
   testIntegration: async (config: { url: string; authKey: string; authValue: string; testPhone: string }) => {
-    return request<{ success: boolean; data?: any; message?: string }>('/settings/test-integration', {
+    return await request<{ success: boolean; data?: any; message?: string }>('/settings/test-integration', {
       method: 'POST',
       body: JSON.stringify(config)
     });
@@ -113,15 +123,15 @@ export const api = {
 
   // --- CUSTOMERS ---
   searchCustomer: async (query: string): Promise<CustomerSummary | null> => {
-    return request<CustomerSummary | null>(`/customers/search?q=${encodeURIComponent(query)}`);
+    return await request<CustomerSummary | null>(`/customers/search?q=${encodeURIComponent(query)}`);
   },
 
   getCustomerTransactions: async (customerId: string): Promise<Transaction[]> => {
-    return request<Transaction[]>(`/customers/${customerId}/transactions`);
+    return await request<Transaction[]>(`/customers/${customerId}/transactions`);
   },
 
   addCoins: async (data: { phone: string; coins: number; description?: string }): Promise<{ success: boolean; newBalance: number }> => {
-    return request('/wallet/credit', {
+    return await request('/wallet/credit', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -129,28 +139,28 @@ export const api = {
 
   // --- AUTOMATIONS ---
   getAutomationJobs: async (): Promise<AutomationJob[]> => {
-    return request<AutomationJob[]>('/automations');
+    return await request<AutomationJob[]>('/automations');
   },
 
   saveAutomationJob: async (job: Omit<AutomationJob, 'id'>): Promise<AutomationJob> => {
-    return request<AutomationJob>('/automations', {
+    return await request<AutomationJob>('/automations', {
       method: 'POST',
       body: JSON.stringify(job),
     });
   },
 
   deleteAutomationJob: async (id: string): Promise<void> => {
-    return request<void>(`/automations/${id}`, { method: 'DELETE' });
+    return await request<void>(`/automations/${id}`, { method: 'DELETE' });
   },
 
   toggleAutomationJob: async (id: string, status: 'ACTIVE' | 'PAUSED'): Promise<void> => {
-    return request<void>(`/automations/${id}/toggle`, {
+    return await request<void>(`/automations/${id}/toggle`, {
         method: 'PUT',
         body: JSON.stringify({ status })
     });
   },
 
   getAutomationAnalytics: async (period: 'DAILY' | 'MONTHLY' | 'YEARLY'): Promise<AutomationAnalytics> => {
-    return request<AutomationAnalytics>(`/automations/analytics?period=${period}`);
+    return await request<AutomationAnalytics>(`/automations/analytics?period=${period}`);
   }
 };

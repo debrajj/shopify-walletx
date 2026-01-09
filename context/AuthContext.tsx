@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { config } from '../config/env';
 
 interface User {
   id: string;
@@ -27,14 +28,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check for existing session in localStorage
-    const storedUser = localStorage.getItem('shopwallet_user');
+    const storedUser = localStorage.getItem(config.storage.userKey);
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
         setIsAuthenticated(true);
       } catch (e) {
-        localStorage.removeItem('shopwallet_user');
+        localStorage.removeItem(config.storage.userKey);
       }
     }
     setIsLoading(false);
@@ -45,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userData = response.user;
     
     // Persist session
-    localStorage.setItem('shopwallet_user', JSON.stringify(userData));
+    localStorage.setItem(config.storage.userKey, JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
   };
@@ -55,13 +56,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userData = response.user;
     
     // Persist session
-    localStorage.setItem('shopwallet_user', JSON.stringify(userData));
+    localStorage.setItem(config.storage.userKey, JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    localStorage.removeItem('shopwallet_user');
+    localStorage.removeItem(config.storage.userKey);
     setUser(null);
     setIsAuthenticated(false);
   };

@@ -11,7 +11,7 @@ const Reports: React.FC = () => {
   
   // Filters
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
-  const [dateRange, setDateRange] = useState('30_DAYS'); // MOCK: simple select
+  const [dateRange, setDateRange] = useState('30_DAYS');
   const [showExpiringOnly, setShowExpiringOnly] = useState(false);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ const Reports: React.FC = () => {
       result = result.filter(t => t.type === 'CREDIT' && t.expires_at);
     }
 
-    // Mock Date Filtering
+    // Date Filtering
     // In a real app, we'd compare dates properly
     
     setFilteredTransactions(result);

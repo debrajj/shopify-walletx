@@ -3,12 +3,26 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const db = require('./config/db');
-const crypto = require('crypto');
+const path = require('path');
+
+// Load .env from the project root (two levels up from this file)
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
+// Shopify integration
+const shopifyRoutes = require('./shopify/routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const BCRYPT_SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '10');
+const DEFAULT_OTP_EXPIRY_SECONDS = parseInt(process.env.DEFAULT_OTP_EXPIRY_SECONDS || '120');
 
-app.use(cors());
+// CORS Configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: process.env.CORS_CREDENTIALS === 'true',
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
 // --- DATABASE INIT (SaaS Schema) ---
@@ -125,6 +139,22 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // 8. Shopify Session Storage Table (for OAuth)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS shopify_sessions (
+        id VARCHAR(255) PRIMARY KEY,
+        shop VARCHAR(255) NOT NULL,
+        state VARCHAR(255) NOT NULL,
+        isOnline BOOLEAN NOT NULL DEFAULT FALSE,
+        scope VARCHAR(1024),
+        expires TIMESTAMP,
+        accessToken VARCHAR(255),
+        onlineAccessInfo TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     
     console.log("Database initialized for Multi-Tenancy.");
   } catch (err) {
@@ -160,7 +190,7 @@ const requireStorefrontAuth = async (req, res, next) => {
 // For Admin APIs: In a real app, verify JWT. Here we assume the client sends the storeUrl in headers or we extract from login context
 // For this demo, we will check a custom header 'x-admin-store-url' which the frontend should send, 
 // OR simpler for this stage: We'll extract it from the user session lookup if provided.
-// To keep it simple and working with the current frontend that mocks auth:
+// To keep it simple and working with the current frontend:
 const requireAdminAuth = async (req, res, next) => {
   // In production, decode JWT from 'Authorization' header to get user.store_url
   // For now, we'll assume the client is valid or pass a header. 
@@ -241,7 +271,7 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'User or Store URL already registered' });
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
     const hash = await bcrypt.hash(password, salt);
 
     // Create Tenant
@@ -351,7 +381,7 @@ app.post('/api/otp/send', requireStorefrontAuth, async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const sessionId = `OTP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    const expiresAt = new Date(Date.now() + 120 * 1000);
+    const expiresAt = new Date(Date.now() + DEFAULT_OTP_EXPIRY_SECONDS * 1000);
 
     // Scoped by store_url
     await db.query(`
@@ -361,7 +391,7 @@ app.post('/api/otp/send', requireStorefrontAuth, async (req, res) => {
 
     console.log(`[${shopUrl}] OTP for ${phone}: ${otp}`);
 
-    res.json({ success: true, otpSessionId: sessionId, expiresIn: 120 });
+    res.json({ success: true, otpSessionId: sessionId, expiresIn: DEFAULT_OTP_EXPIRY_SECONDS });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -920,6 +950,12 @@ app.get('/api/automations/analytics', requireAdminAuth, async (req, res) => {
     res.status(500).json({ error: 'Server error fetching analytics' });
   }
 });
+
+// --- SHOPIFY INTEGRATION ROUTES ---
+// Mount Shopify coin/rewards routes
+app.use('/api/shopify/coins', shopifyRoutes);
+
+console.log('Shopify coin integration routes mounted at /api/shopify/coins');
 
 // Start Server
 const startServer = (port) => {

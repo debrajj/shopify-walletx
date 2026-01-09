@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter, Routes, Route, NavLink, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { LayoutDashboard, Receipt, Settings as SettingsIcon, Wallet, BarChart3, Users, Clock, Bell, ChevronDown, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { config } from './config/env';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -48,7 +49,7 @@ const TopNavigation: React.FC = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
                 <Wallet className="h-5 w-5" />
               </div>
-              <span className="text-lg font-bold tracking-tight text-slate-900">ShopWallet</span>
+              <span className="text-lg font-bold tracking-tight text-slate-900">{config.app.name}</span>
             </div>
             
             <div className="hidden md:flex items-center gap-1">

@@ -20,10 +20,8 @@ This starts the Admin UI (React + Vite).
     ```
 4.  Open `http://localhost:5173` in your browser.
 
-> **Note:** The frontend runs in **Mock Mode** by default if the backend is not running. You will see simulated data.
-
-### 2. Backend Setup (Optional)
-If you want to connect to a real database and API:
+### 2. Backend Setup (Required)
+To use the application, you need to run the backend server:
 
 1.  Navigate to the backend directory:
     ```bash
@@ -46,7 +44,7 @@ If you want to connect to a real database and API:
 
 ### 3. Connecting Frontend to Backend
 The frontend is configured to proxy requests to `http://localhost:3000` via `vite.config.ts`.
-If your backend is running, the frontend will automatically try to fetch real data. If the connection fails, it falls back to mock data.
+Make sure your backend is running to access real data and functionality.
 
 ## 🛠 Tech Stack
 - **Frontend:** React, Vite, Tailwind CSS, Lucide Icons, Recharts
