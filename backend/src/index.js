@@ -957,6 +957,96 @@ app.use('/api/shopify/coins', shopifyRoutes);
 
 console.log('Shopify coin integration routes mounted at /api/shopify/coins');
 
+// --- SHOPIFY APP OAUTH ROUTES ---
+
+// Generate OAuth installation URL
+app.post('/api/shopify/auth/install', async (req, res) => {
+  try {
+    const { shop } = req.body;
+    
+    if (!shop) {
+      return res.status(400).json({ error: 'Shop parameter is required' });
+    }
+
+    const apiKey = process.env.SHOPIFY_API_KEY;
+    const redirectUri = process.env.SHOPIFY_REDIRECT_URI || 'https://shopify-walletx-1.onrender.com/auth/callback';
+    const scopes = 'read_orders,write_orders,read_customers,write_customers,read_discounts,write_discounts';
+    
+    // Generate nonce for security
+    const nonce = Math.random().toString(36).substring(7);
+    
+    // Build OAuth URL
+    const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${apiKey}&scope=${scopes}&redirect_uri=${redirectUri}&state=${nonce}`;
+    
+    res.json({ authUrl });
+  } catch (err) {
+    console.error('Install error:', err);
+    res.status(500).json({ error: 'Failed to generate installation URL' });
+  }
+});
+
+// Handle OAuth callback and exchange code for access token
+app.post('/api/shopify/auth/callback', async (req, res) => {
+  try {
+    const { shop, code, hmac } = req.body;
+    
+    if (!shop || !code) {
+      return res.status(400).json({ success: false, error: 'Missing required parameters' });
+    }
+
+    const apiKey = process.env.SHOPIFY_API_KEY;
+    const apiSecret = process.env.SHOPIFY_API_SECRET;
+    
+    // Exchange code for access token
+    const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: apiKey,
+        client_secret: apiSecret,
+        code: code
+      })
+    });
+    
+    const tokenData = await tokenResponse.json();
+    
+    if (tokenData.access_token) {
+      // Store or update the shop's access token in database
+      const checkShop = await db.query('SELECT * FROM users WHERE store_url = $1', [shop]);
+      
+      if (checkShop.rows.length > 0) {
+        // Update existing shop
+        await db.query(`
+          UPDATE users 
+          SET shopify_access_token = $1, shopify_api_key = $2
+          WHERE store_url = $3
+        `, [tokenData.access_token, apiKey, shop]);
+      } else {
+        // Create new shop entry
+        const defaultPassword = await bcrypt.hash('changeme123', BCRYPT_SALT_ROUNDS);
+        await db.query(`
+          INSERT INTO users (store_url, shopify_access_token, shopify_api_key, email, password_hash, name, store_name)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [shop, tokenData.access_token, apiKey, `admin@${shop}`, defaultPassword, 'Admin', shop]);
+        
+        // Create default settings
+        await db.query(`
+          INSERT INTO app_settings (store_url, is_wallet_enabled) VALUES ($1, true)
+        `, [shop]);
+      }
+      
+      console.log(`✅ Shopify app installed for: ${shop}`);
+      res.json({ success: true, shop });
+    } else {
+      console.error('Failed to get access token:', tokenData);
+      res.status(400).json({ success: false, error: 'Failed to get access token' });
+    }
+  } catch (err) {
+    console.error('OAuth callback error:', err);
+    res.status(500).json({ success: false, error: 'Server error during OAuth' });
+  }
+});
+
 // Start Server
 const startServer = (port) => {
   const server = app.listen(port, () => {

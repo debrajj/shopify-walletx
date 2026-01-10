@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, NavLink, useLocation, Navigate, Outlet } fro
 import { LayoutDashboard, Receipt, Settings as SettingsIcon, Wallet, BarChart3, Users, Clock, ChevronDown, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { config } from './config/env';
+import { AppBridgeProvider } from './shopify/AppBridgeProvider';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -13,6 +14,8 @@ import Settings from './pages/Settings';
 import Reports from './pages/Reports';
 import Customers from './pages/Customers';
 import Automations from './pages/Automations';
+import { ShopifyAuthCallback } from './pages/ShopifyAuthCallback';
+import { ShopifyInstall } from './pages/ShopifyInstall';
 
 // --- COMPONENTS ---
 
@@ -157,30 +160,37 @@ const PublicLayout: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <HashRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-          </Route>
+    <AppBridgeProvider>
+      <AuthProvider>
+        <HashRouter>
+          <Routes>
+            {/* Shopify OAuth Routes */}
+            <Route path="/auth/callback" element={<ShopifyAuthCallback />} />
+            <Route path="/auth/shopify/callback" element={<ShopifyAuthCallback />} />
+            <Route path="/install" element={<ShopifyInstall />} />
 
-          {/* Protected Dashboard Routes */}
-          <Route element={<ProtectedLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/automations" element={<Automations />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-          
-          {/* Catch all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </HashRouter>
-    </AuthProvider>
+            {/* Public Routes */}
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+            </Route>
+
+            {/* Protected Dashboard Routes */}
+            <Route element={<ProtectedLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/automations" element={<Automations />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+            
+            {/* Catch all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </HashRouter>
+      </AuthProvider>
+    </AppBridgeProvider>
   );
 };
 
