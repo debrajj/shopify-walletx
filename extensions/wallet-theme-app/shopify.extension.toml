@@ -1,0 +1,6 @@
+type = "theme"
+name = "Wallet Widget"
+
+[build]
+command = ""
+path = ""

@@ -1,0 +1,417 @@
+{% schema %}
+{
+  "name": "Wallet Widget",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Widget Title",
+      "default": "💰 Use Your Wallet Coins"
+    },
+    {
+      "type": "color",
+      "id": "bg_color",
+      "label": "Background Color",
+      "default": "#667eea"
+    }
+  ]
+}
+{% endschema %}
+
+<div class="wallet-widget-app-block" data-shop="{{ shop.permanent_domain }}">
+  <div class="wallet-container" style="background: linear-gradient(135deg, {{ block.settings.bg_color }} 0%, #764ba2 100%);">
+    <h3 class="wallet-title">{{ block.settings.title }}</h3>
+    
+    <div id="wallet-step-phone-{{ block.id }}" class="wallet-step">
+      <p>Enter your phone number</p>
+      <input 
+        type="tel" 
+        id="wallet-phone-{{ block.id }}" 
+        placeholder="+1234567890"
+        class="wallet-input"
+      />
+      <button class="wallet-button" onclick="walletWidget{{ block.id }}.sendOTP()">
+        Send OTP
+      </button>
+    </div>
+
+    <div id="wallet-step-otp-{{ block.id }}" class="wallet-step" style="display: none;">
+      <p>Enter OTP sent to <span id="wallet-phone-display-{{ block.id }}"></span></p>
+      <input 
+        type="number" 
+        id="wallet-otp-{{ block.id }}" 
+        placeholder="123456"
+        class="wallet-input"
+      />
+      <button class="wallet-button" onclick="walletWidget{{ block.id }}.verifyOTP()">
+        Verify OTP
+      </button>
+      <button class="wallet-button-secondary" onclick="walletWidget{{ block.id }}.showStep('phone')">
+        Change Phone
+      </button>
+    </div>
+
+    <div id="wallet-step-balance-{{ block.id }}" class="wallet-step" style="display: none;">
+      <div class="wallet-balance-card">
+        <p class="wallet-balance-label">Available Balance</p>
+        <p class="wallet-balance-amount" id="wallet-balance-{{ block.id }}">0</p>
+        <p class="wallet-balance-currency">Coins</p>
+      </div>
+      
+      <div id="wallet-has-balance-{{ block.id }}" style="display: none;">
+        <input 
+          type="number" 
+          id="wallet-coins-{{ block.id }}" 
+          placeholder="Enter coins to use"
+          class="wallet-input"
+        />
+        <button class="wallet-button" onclick="walletWidget{{ block.id }}.applyCoins()">
+          Apply Coins
+        </button>
+      </div>
+      
+      <div id="wallet-no-balance-{{ block.id }}" style="display: none;">
+        <p style="opacity: 0.8;">You don't have any coins yet.</p>
+      </div>
+      
+      <button class="wallet-button-secondary" onclick="walletWidget{{ block.id }}.showStep('phone')">
+        Use Different Phone
+      </button>
+    </div>
+
+    <div id="wallet-message-{{ block.id }}" class="wallet-message"></div>
+    <div id="wallet-loading-{{ block.id }}" class="wallet-loading" style="display: none;">
+      <div class="wallet-spinner"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wallet-widget-app-block {
+    max-width: 500px;
+    margin: 20px auto;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .wallet-container {
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    color: white;
+  }
+
+  .wallet-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 24px 0;
+    text-align: center;
+  }
+
+  .wallet-step {
+    margin-bottom: 16px;
+  }
+
+  .wallet-step p {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    opacity: 0.9;
+  }
+
+  .wallet-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    font-size: 16px;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+  }
+
+  .wallet-input::placeholder {
+    color: rgba(255,255,255,0.6);
+  }
+
+  .wallet-input:focus {
+    outline: none;
+    border-color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.15);
+  }
+
+  .wallet-button {
+    width: 100%;
+    padding: 14px;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+  }
+
+  .wallet-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+
+  .wallet-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .wallet-button-secondary {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .wallet-button-secondary:hover {
+    background: rgba(255,255,255,0.3);
+  }
+
+  .wallet-balance-card {
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 16px;
+    backdrop-filter: blur(10px);
+  }
+
+  .wallet-balance-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+    margin: 0 0 8px 0;
+  }
+
+  .wallet-balance-amount {
+    font-size: 48px;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1;
+  }
+
+  .wallet-balance-currency {
+    font-size: 14px;
+    opacity: 0.8;
+    margin: 8px 0 0 0;
+  }
+
+  .wallet-message {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .wallet-message.success {
+    background: rgba(76, 175, 80, 0.3);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+  }
+
+  .wallet-message.error {
+    background: rgba(244, 67, 54, 0.3);
+    border: 1px solid rgba(244, 67, 54, 0.5);
+  }
+
+  .wallet-loading {
+    text-align: center;
+    padding: 20px;
+  }
+
+  .wallet-spinner {
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top: 3px solid white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: wallet-spin 1s linear infinite;
+    margin: 0 auto;
+  }
+
+  @keyframes wallet-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+
+<script>
+(function() {
+  const API_BASE = 'https://shopify-walletx.onrender.com/api';
+  const shop = document.querySelector('.wallet-widget-app-block').dataset.shop;
+  const blockId = '{{ block.id }}';
+  
+  window.walletWidget{{ block.id }} = {
+    otpSessionId: '',
+    currentPhone: '',
+    
+    showStep: function(step) {
+      document.getElementById('wallet-step-phone-' + blockId).style.display = step === 'phone' ? 'block' : 'none';
+      document.getElementById('wallet-step-otp-' + blockId).style.display = step === 'otp' ? 'block' : 'none';
+      document.getElementById('wallet-step-balance-' + blockId).style.display = step === 'balance' ? 'block' : 'none';
+    },
+    
+    showMessage: function(text, type) {
+      const msgEl = document.getElementById('wallet-message-' + blockId);
+      msgEl.textContent = text;
+      msgEl.className = 'wallet-message ' + type;
+      setTimeout(() => {
+        msgEl.textContent = '';
+        msgEl.className = 'wallet-message';
+      }, 5000);
+    },
+    
+    setLoading: function(loading) {
+      document.getElementById('wallet-loading-' + blockId).style.display = loading ? 'block' : 'none';
+    },
+    
+    sendOTP: async function() {
+      const phone = document.getElementById('wallet-phone-' + blockId).value.trim();
+      if (!phone) {
+        this.showMessage('Please enter your phone number', 'error');
+        return;
+      }
+
+      this.setLoading(true);
+
+      try {
+        const response = await fetch(API_BASE + '/otp/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-shop-url': shop,
+          },
+          body: JSON.stringify({ phone }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.otpSessionId = data.otpSessionId;
+          this.currentPhone = phone;
+          document.getElementById('wallet-phone-display-' + blockId).textContent = phone;
+          this.showStep('otp');
+          this.showMessage('OTP sent!', 'success');
+        } else {
+          this.showMessage(data.message || 'Failed to send OTP', 'error');
+        }
+      } catch (err) {
+        this.showMessage('Network error', 'error');
+      } finally {
+        this.setLoading(false);
+      }
+    },
+    
+    verifyOTP: async function() {
+      const otp = document.getElementById('wallet-otp-' + blockId).value.trim();
+      if (!otp) {
+        this.showMessage('Please enter OTP', 'error');
+        return;
+      }
+
+      this.setLoading(true);
+
+      try {
+        const response = await fetch(API_BASE + '/otp/validate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-shop-url': shop,
+          },
+          body: JSON.stringify({ otpSessionId: this.otpSessionId, otp }),
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.verified) {
+          await this.fetchBalance();
+          this.showStep('balance');
+          this.showMessage('Verified!', 'success');
+        } else {
+          this.showMessage('Invalid OTP', 'error');
+        }
+      } catch (err) {
+        this.showMessage('Network error', 'error');
+      } finally {
+        this.setLoading(false);
+      }
+    },
+    
+    fetchBalance: async function() {
+      try {
+        const response = await fetch(
+          API_BASE + '/wallet/balance?phone=' + encodeURIComponent(this.currentPhone),
+          {
+            headers: {
+              'x-shop-url': shop,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          const balance = data.walletCoins || 0;
+          document.getElementById('wallet-balance-' + blockId).textContent = balance;
+          
+          if (balance > 0) {
+            document.getElementById('wallet-has-balance-' + blockId).style.display = 'block';
+            document.getElementById('wallet-no-balance-' + blockId).style.display = 'none';
+          } else {
+            document.getElementById('wallet-has-balance-' + blockId).style.display = 'none';
+            document.getElementById('wallet-no-balance-' + blockId).style.display = 'block';
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch balance:', err);
+      }
+    },
+    
+    applyCoins: async function() {
+      const coins = parseFloat(document.getElementById('wallet-coins-' + blockId).value);
+
+      if (!coins || coins <= 0) {
+        this.showMessage('Enter valid amount', 'error');
+        return;
+      }
+
+      const balance = parseFloat(document.getElementById('wallet-balance-' + blockId).textContent);
+      if (coins > balance) {
+        this.showMessage('Only ' + balance + ' coins available', 'error');
+        return;
+      }
+
+      this.setLoading(true);
+
+      try {
+        const phoneDigits = this.currentPhone.replace(/\D/g, '');
+        const discountCode = 'WALLET-' + phoneDigits + '-' + coins;
+
+        this.showMessage('Applying ' + coins + ' coins...', 'success');
+        
+        setTimeout(() => {
+          window.location.href = '/discount/' + discountCode + '?redirect=/checkout';
+        }, 1000);
+      } catch (error) {
+        this.showMessage('Failed to apply', 'error');
+        this.setLoading(false);
+      }
+    }
+  };
+})();
+</script>
