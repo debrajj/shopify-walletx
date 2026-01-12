@@ -9,8 +9,8 @@ const path = require('path');
 // Load .env from the project root (two levels up from this file)
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-// Shopify integration
-const shopifyRoutes = require('./shopify/routes');
+// Shopify integration - DISABLED (not needed for wallet widget)
+// const shopifyRoutes = require('./shopify/routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -996,11 +996,11 @@ app.get('/api/automations/analytics', requireAdminAuth, async (req, res) => {
   }
 });
 
-// --- SHOPIFY INTEGRATION ROUTES ---
+// --- SHOPIFY INTEGRATION ROUTES --- DISABLED
 // Mount Shopify coin/rewards routes
-app.use('/api/shopify/coins', shopifyRoutes);
+// app.use('/api/shopify/coins', shopifyRoutes);
 
-console.log('Shopify coin integration routes mounted at /api/shopify/coins');
+// console.log('Shopify coin integration routes mounted at /api/shopify/coins');
 
 // --- SHOPIFY SCRIPT TAG MANAGEMENT ---
 
