@@ -109,7 +109,7 @@ export default function WidgetInstaller() {
           padding: '24px',
           marginBottom: '24px',
         }}>
-          <p style={{ margin: '0 0 8px 0', fontSize: '14px', opacity: 0.8' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '14px', opacity: 0.8 }}>
             Store:
           </p>
           <p style={{ margin: '0', fontSize: '18px', fontWeight: '600' }}>
