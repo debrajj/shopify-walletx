@@ -190,12 +190,6 @@ router.post('/create-discount', requireShopifyAuth, async (req, res) => {
     });
   }
 });
-    });
-  } catch (error) {
-    console.error('[Shopify] Create discount error:', error);
-    res.status(500).json({ error: 'Failed to create discount' });
-  }
-});
 
 // Shopify webhook: Customer created
 router.post('/webhooks/customers/create', async (req, res) => {
