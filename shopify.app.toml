@@ -1,0 +1,24 @@
+# Shopify App Configuration
+name = "wallet-app"
+client_id = "your_client_id_here"
+application_url = "https://shopify-walletx-1.onrender.com"
+embedded = true
+
+[access_scopes]
+scopes = "read_orders,write_orders,read_customers,write_customers,read_discounts,write_discounts,read_script_tags,write_script_tags"
+
+[auth]
+redirect_urls = [
+  "https://shopify-walletx-1.onrender.com/auth/callback",
+  "https://shopify-walletx-1.onrender.com/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2024-01"
+
+[[webhooks.subscriptions]]
+topics = ["orders/paid"]
+uri = "https://shopify-walletx.onrender.com/webhooks/orders/paid"
+
+[pos]
+embedded = false
