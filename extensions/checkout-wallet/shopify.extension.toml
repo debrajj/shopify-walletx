@@ -1,0 +1,10 @@
+# Shopify Checkout UI Extension Configuration
+api_version = "2024-01"
+
+[[extensions]]
+type = "ui_extension"
+name = "wallet-checkout"
+handle = "wallet-checkout"
+
+[[extensions.targeting]]
+target = "purchase.checkout.block.render"
