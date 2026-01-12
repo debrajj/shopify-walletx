@@ -9,8 +9,9 @@ const path = require('path');
 // Load .env from the project root (two levels up from this file)
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-// Shopify integration - DISABLED (not needed for wallet widget)
-// const shopifyRoutes = require('./shopify/routes');
+// Shopify integration routes
+const shopifyRoutes = require('./shopify/routes');
+app.use('/api/shopify', shopifyRoutes);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
