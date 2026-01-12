@@ -3,7 +3,7 @@ import { HashRouter, Routes, Route, NavLink, useLocation, Navigate, Outlet } fro
 import { LayoutDashboard, Receipt, Settings as SettingsIcon, Wallet, BarChart3, Users, Clock, ChevronDown, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { config } from './config/env';
-import { AppBridgeProvider } from './shopify/AppBridgeProvider';
+import { AppBridgeProvider } from './src/shopify/AppBridgeProvider';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -14,8 +14,8 @@ import Settings from './pages/Settings';
 import Reports from './pages/Reports';
 import Customers from './pages/Customers';
 import Automations from './pages/Automations';
-import { ShopifyAuthCallback } from './pages/ShopifyAuthCallback';
-import { ShopifyInstall } from './pages/ShopifyInstall';
+import { ShopifyAuthCallback } from './src/pages/ShopifyAuthCallback';
+import { ShopifyInstall } from './src/pages/ShopifyInstall';
 
 // --- COMPONENTS ---
 
