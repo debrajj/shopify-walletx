@@ -306,6 +306,7 @@
       }
       
       console.log('[Wallet Widget] Injected after .cart-discount');
+      attachButtonHandler(clone);
       return true;
     }
     
@@ -338,12 +339,29 @@
         }
         
         console.log('[Wallet Widget] Injected into:', selector);
+        attachButtonHandler(clone);
         return true;
       }
     }
     
     console.log('[Wallet Widget] No cart container found');
     return false;
+  }
+  
+  // Attach click handler directly to the button in the cloned widget
+  function attachButtonHandler(clonedWidget) {
+    const button = clonedWidget.querySelector('[data-wallet-action="check-balance"]');
+    if (button) {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Wallet Widget] Button clicked (direct handler)');
+        walletAppEmbed.checkBalance();
+      });
+      console.log('[Wallet Widget] Button handler attached');
+    } else {
+      console.error('[Wallet Widget] Button not found in cloned widget');
+    }
   }
   
   // Try injection on load
@@ -402,16 +420,25 @@
     subtree: true
   });
   
-  // Use event delegation for button clicks (works with cloned elements)
+  // Use event delegation for button clicks (backup method)
   document.addEventListener('click', function(e) {
-    if (e.target && e.target.hasAttribute('data-wallet-action')) {
-      const action = e.target.getAttribute('data-wallet-action');
-      if (action === 'check-balance') {
-        console.log('[Wallet Widget] Check balance button clicked');
-        walletAppEmbed.checkBalance();
+    const target = e.target;
+    // Check if clicked element or any parent has the data attribute
+    let element = target;
+    while (element && element !== document) {
+      if (element.hasAttribute && element.hasAttribute('data-wallet-action')) {
+        const action = element.getAttribute('data-wallet-action');
+        if (action === 'check-balance') {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('[Wallet Widget] Button clicked (event delegation)');
+          walletAppEmbed.checkBalance();
+          return;
+        }
       }
+      element = element.parentElement;
     }
-  });
+  }, true); // Use capture phase
   
   console.log('[Wallet Widget] Initialized and watching for cart');
 })();
