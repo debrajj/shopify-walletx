@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
 const db = require('./config/db');
 const path = require('path');
 
@@ -1078,8 +1079,6 @@ app.post('/api/shopify/uninstall-widget', async (req, res) => {
 
 // Serve widget script
 app.get('/widget.js', (req, res) => {
-  const fs = require('fs');
-  const path = require('path');
   const scriptPath = path.join(__dirname, '../../extensions/wallet-script-tag/wallet-widget.js');
   
   res.setHeader('Content-Type', 'application/javascript');
@@ -1108,7 +1107,7 @@ app.post('/api/shopify/auth/install', async (req, res) => {
 
     const apiKey = process.env.SHOPIFY_API_KEY;
     const redirectUri = process.env.SHOPIFY_REDIRECT_URI || 'https://shopify-walletx-1.onrender.com/auth/callback';
-    const scopes = 'read_orders,write_orders,read_customers,write_customers,read_discounts,write_discounts';
+    const scopes = 'read_orders,write_orders,read_customers,write_customers,read_discounts,write_discounts,read_script_tags,write_script_tags';
     
     // Generate nonce for security
     const nonce = Math.random().toString(36).substring(7);
