@@ -1,19 +1,10 @@
 const { shopifyApp } = require('@shopify/shopify-app-express');
 const { PostgreSQLSessionStorage } = require('@shopify/shopify-app-session-storage-postgresql');
-const { Pool } = require('pg');
+const db = require('../config/db');
 
-// Use existing database pool
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-});
-
-// Session storage for Shopify
-const sessionStorage = new PostgreSQLSessionStorage(pool);
+// Use existing database connection from db.js
+// Session storage for Shopify - use the existing db.query connection
+const sessionStorage = new PostgreSQLSessionStorage(db);
 
 // Shopify app configuration
 const shopify = shopifyApp({
@@ -37,4 +28,4 @@ const shopify = shopifyApp({
   useOnlineTokens: true,
 });
 
-module.exports = { shopify, pool };
+module.exports = { shopify, sessionStorage };
