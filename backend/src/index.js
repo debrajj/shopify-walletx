@@ -76,6 +76,7 @@ const initDb = async () => {
         phone_hash VARCHAR(255),
         customer_name VARCHAR(255),
         customer_phone VARCHAR(50),
+        customer_email VARCHAR(255),
         balance DECIMAL(10, 2) DEFAULT 0.00,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -301,10 +302,14 @@ app.post('/api/auth/signup', async (req, res) => {
 // 1. Get Wallet Balance
 app.get('/api/wallet/balance', requireStorefrontAuth, async (req, res) => {
   try {
-    const { phone } = req.query;
+    const { phone, email } = req.query;
     const shopUrl = req.shopUrl; // From Middleware
 
-    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+    // Support both phone and email
+    const identifier = email || phone;
+    const identifierType = email ? 'email' : 'phone';
+
+    if (!identifier) return res.status(400).json({ error: 'Email or phone number is required' });
 
     // Get settings for THIS store
     const settingsRes = await db.query('SELECT * FROM app_settings WHERE store_url = $1', [shopUrl]);
@@ -321,7 +326,7 @@ app.get('/api/wallet/balance', requireStorefrontAuth, async (req, res) => {
     if (settings.use_custom_api && settings.custom_api_wallet_balance_url) {
        try {
          const urlObj = new URL(settings.custom_api_wallet_balance_url);
-         urlObj.searchParams.append('phone', phone);
+         urlObj.searchParams.append(identifierType, identifier);
          urlObj.searchParams.append('shop', shopUrl);
          
          const headers = { 'Content-Type': 'application/json' };
@@ -344,20 +349,37 @@ app.get('/api/wallet/balance', requireStorefrontAuth, async (req, res) => {
     }
 
     // Local DB Logic (Scoped by store_url)
-    const walletCheck = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [phone, shopUrl]);
+    // Check by email or phone
+    let walletCheck;
+    if (identifierType === 'email') {
+      walletCheck = await db.query('SELECT * FROM wallets WHERE customer_email = $1 AND store_url = $2', [identifier, shopUrl]);
+    } else {
+      walletCheck = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [identifier, shopUrl]);
+    }
     
     if (walletCheck.rows.length > 0) {
        if (externalSyncSuccess) {
-          await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE customer_phone = $2 AND store_url = $3', [balance, phone, shopUrl]);
+          if (identifierType === 'email') {
+            await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE customer_email = $2 AND store_url = $3', [balance, identifier, shopUrl]);
+          } else {
+            await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE customer_phone = $2 AND store_url = $3', [balance, identifier, shopUrl]);
+          }
        } else {
           balance = parseFloat(walletCheck.rows[0].balance);
        }
     } else {
        // Create new wallet for this store
-       await db.query(`
-         INSERT INTO wallets (store_url, phone_hash, customer_name, customer_phone, balance)
-         VALUES ($1, $2, 'Guest', $3, $4)
-       `, [shopUrl, phone, phone, balance]);
+       if (identifierType === 'email') {
+         await db.query(`
+           INSERT INTO wallets (store_url, phone_hash, customer_name, customer_email, balance)
+           VALUES ($1, $2, 'Guest', $3, $4)
+         `, [shopUrl, identifier, identifier, balance]);
+       } else {
+         await db.query(`
+           INSERT INTO wallets (store_url, phone_hash, customer_name, customer_phone, balance)
+           VALUES ($1, $2, 'Guest', $3, $4)
+         `, [shopUrl, identifier, identifier, balance]);
+       }
     }
 
     res.json({
