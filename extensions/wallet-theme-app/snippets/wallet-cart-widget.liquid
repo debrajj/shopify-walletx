@@ -1,0 +1,265 @@
+<div id="wallet-cart-widget" class="wallet-cart-widget" data-shop="{{ shop.permanent_domain }}">
+  <div class="wallet-cart-container">
+    <div class="wallet-cart-header">
+      <span class="wallet-cart-icon">💰</span>
+      <span class="wallet-cart-title">Wallet Coins</span>
+    </div>
+    
+    <div id="wallet-cart-balance" class="wallet-cart-balance">
+      <span class="wallet-cart-balance-amount" id="wallet-balance-display">0</span>
+      <span class="wallet-cart-balance-label">coins available</span>
+    </div>
+    
+    <div id="wallet-cart-apply" class="wallet-cart-apply" style="display: none;">
+      <input 
+        type="number" 
+        id="wallet-coins-input" 
+        placeholder="Coins to use"
+        class="wallet-cart-input"
+        min="1"
+      />
+      <button class="wallet-cart-button" onclick="walletCartWidget.applyCoins()">
+        Apply at Checkout
+      </button>
+    </div>
+    
+    <div id="wallet-cart-login" class="wallet-cart-login">
+      <input 
+        type="tel" 
+        id="wallet-phone" 
+        placeholder="Phone number"
+        class="wallet-cart-input"
+      />
+      <button class="wallet-cart-button-small" onclick="walletCartWidget.checkBalance()">
+        Check Balance
+      </button>
+    </div>
+    
+    <div id="wallet-cart-message" class="wallet-cart-message"></div>
+  </div>
+</div>
+
+<style>
+  .wallet-cart-widget {
+    padding: 16px;
+    margin: 12px 0;
+    border-radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .wallet-cart-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 16px;
+    color: white;
+  }
+
+  .wallet-cart-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .wallet-cart-icon {
+    font-size: 20px;
+  }
+
+  .wallet-cart-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .wallet-cart-balance {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    margin-bottom: 12px;
+    backdrop-filter: blur(10px);
+  }
+
+  .wallet-cart-balance-amount {
+    display: block;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .wallet-cart-balance-label {
+    font-size: 12px;
+    opacity: 0.9;
+  }
+
+  .wallet-cart-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 6px;
+    font-size: 14px;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+
+  .wallet-cart-input::placeholder {
+    color: rgba(255,255,255,0.6);
+  }
+
+  .wallet-cart-input:focus {
+    outline: none;
+    border-color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.15);
+  }
+
+  .wallet-cart-button {
+    width: 100%;
+    padding: 12px;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .wallet-cart-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .wallet-cart-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .wallet-cart-button-small {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .wallet-cart-button-small:hover {
+    background: rgba(255,255,255,0.3);
+  }
+
+  .wallet-cart-message {
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .wallet-cart-message.success {
+    background: rgba(76, 175, 80, 0.3);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+  }
+
+  .wallet-cart-message.error {
+    background: rgba(244, 67, 54, 0.3);
+    border: 1px solid rgba(244, 67, 54, 0.5);
+  }
+</style>
+
+<script>
+(function() {
+  if (window.walletCartWidget) return; // Already initialized
+  
+  const API_BASE = 'https://shopify-walletx.onrender.com/api';
+  const widgetEl = document.getElementById('wallet-cart-widget');
+  if (!widgetEl) return;
+  
+  const shop = widgetEl.dataset.shop;
+  
+  window.walletCartWidget = {
+    currentPhone: '',
+    currentBalance: 0,
+    
+    showMessage: function(text, type) {
+      const msgEl = document.getElementById('wallet-cart-message');
+      msgEl.textContent = text;
+      msgEl.className = 'wallet-cart-message ' + type;
+      setTimeout(() => {
+        msgEl.textContent = '';
+        msgEl.className = 'wallet-cart-message';
+      }, 4000);
+    },
+    
+    checkBalance: async function() {
+      const phone = document.getElementById('wallet-phone').value.trim();
+      if (!phone) {
+        this.showMessage('Please enter phone number', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          API_BASE + '/wallet/balance?phone=' + encodeURIComponent(phone),
+          {
+            headers: {
+              'x-shop-url': shop,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.currentPhone = phone;
+          this.currentBalance = data.walletCoins || 0;
+          
+          document.getElementById('wallet-balance-display').textContent = this.currentBalance;
+          
+          if (this.currentBalance > 0) {
+            document.getElementById('wallet-cart-apply').style.display = 'block';
+            document.getElementById('wallet-cart-login').style.display = 'none';
+            document.getElementById('wallet-coins-input').max = this.currentBalance;
+            this.showMessage('Balance loaded!', 'success');
+          } else {
+            this.showMessage('No coins available', 'error');
+          }
+        } else {
+          this.showMessage('Phone not found', 'error');
+        }
+      } catch (err) {
+        this.showMessage('Network error', 'error');
+      }
+    },
+    
+    applyCoins: function() {
+      const coins = parseFloat(document.getElementById('wallet-coins-input').value);
+
+      if (!coins || coins <= 0) {
+        this.showMessage('Enter valid amount', 'error');
+        return;
+      }
+
+      if (coins > this.currentBalance) {
+        this.showMessage('Only ' + this.currentBalance + ' coins available', 'error');
+        return;
+      }
+
+      const phoneDigits = this.currentPhone.replace(/\D/g, '');
+      const discountCode = 'WALLET-' + phoneDigits + '-' + coins;
+
+      this.showMessage('Redirecting to checkout...', 'success');
+      
+      setTimeout(() => {
+        window.location.href = '/discount/' + discountCode + '?redirect=/checkout';
+      }, 800);
+    }
+  };
+})();
+</script>

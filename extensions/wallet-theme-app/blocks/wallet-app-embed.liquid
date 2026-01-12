@@ -1,0 +1,419 @@
+{% schema %}
+{
+  "name": "Wallet Coins",
+  "target": "body",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Enable Wallet Widget",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
+
+{% if block.settings.enabled %}
+<div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}">
+  <div class="wallet-embed-container">
+    <div class="wallet-embed-header">
+      <span class="wallet-embed-icon">💰</span>
+      <span class="wallet-embed-title">Your Wallet</span>
+    </div>
+    
+    <div id="wallet-embed-login" class="wallet-embed-login">
+      <input 
+        type="email" 
+        id="wallet-embed-email" 
+        placeholder="Enter your email"
+        class="wallet-embed-input"
+      />
+      <button class="wallet-embed-button" data-wallet-action="check-balance">
+        Check Balance
+      </button>
+    </div>
+    
+    <div id="wallet-embed-balance" class="wallet-embed-balance" style="display: none;">
+      <div class="wallet-embed-balance-display">
+        <span class="wallet-embed-balance-amount" id="wallet-embed-balance-display">0</span>
+        <span class="wallet-embed-balance-label">coins</span>
+      </div>
+    </div>
+    
+    <div id="wallet-embed-message" class="wallet-embed-message"></div>
+  </div>
+</div>
+
+<style>
+  .wallet-app-embed {
+    padding: 16px;
+    margin: 12px 0;
+    border-radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .wallet-embed-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 16px;
+    color: white;
+  }
+
+  .wallet-embed-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .wallet-embed-icon {
+    font-size: 20px;
+  }
+
+  .wallet-embed-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .wallet-embed-balance {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    margin-top: 12px;
+    backdrop-filter: blur(10px);
+  }
+
+  .wallet-embed-balance-display {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .wallet-embed-balance-amount {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .wallet-embed-balance-label {
+    font-size: 14px;
+    opacity: 0.9;
+  }
+
+  .wallet-embed-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 6px;
+    font-size: 14px;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+
+  .wallet-embed-input::placeholder {
+    color: rgba(255,255,255,0.6);
+  }
+
+  .wallet-embed-input:focus {
+    outline: none;
+    border-color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.15);
+  }
+
+  .wallet-embed-button {
+    width: 100%;
+    padding: 12px;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .wallet-embed-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .wallet-embed-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .wallet-embed-message {
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .wallet-embed-message.success {
+    background: rgba(76, 175, 80, 0.3);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+  }
+
+  .wallet-embed-message.error {
+    background: rgba(244, 67, 54, 0.3);
+    border: 1px solid rgba(244, 67, 54, 0.5);
+  }
+
+  /* Hide the original embed element */
+  .wallet-app-embed {
+    display: none !important;
+  }
+  
+  /* Always show the injected clone */
+  #wallet-app-embed-injected {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+  }
+</style>
+
+<script>
+(function() {
+  if (window.walletAppEmbed) return; // Already initialized
+  
+  const API_BASE = 'https://shopify-walletx.onrender.com/api';
+  const embedEl = document.getElementById('wallet-app-embed');
+  if (!embedEl) return;
+  
+  const shop = embedEl.dataset.shop;
+  
+  window.walletAppEmbed = {
+    currentEmail: '',
+    currentBalance: 0,
+    
+    showMessage: function(text, type) {
+      // Try to find message element in both original and injected widget
+      let msgEl = document.getElementById('wallet-embed-message');
+      if (!msgEl) {
+        msgEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-message');
+      }
+      if (!msgEl) {
+        console.error('[Wallet Widget] Message element not found');
+        return;
+      }
+      msgEl.textContent = text;
+      msgEl.className = 'wallet-embed-message ' + type;
+      setTimeout(() => {
+        msgEl.textContent = '';
+        msgEl.className = 'wallet-embed-message';
+      }, 4000);
+    },
+    
+    checkBalance: async function() {
+      // Try to find email input in both original and injected widget
+      let emailEl = document.getElementById('wallet-embed-email');
+      if (!emailEl) {
+        emailEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+      }
+      if (!emailEl) {
+        console.error('[Wallet Widget] Email input not found');
+        return;
+      }
+      
+      const email = emailEl.value.trim();
+      if (!email) {
+        this.showMessage('Please enter your email', 'error');
+        return;
+      }
+
+      // Basic email validation
+      if (!email.includes('@')) {
+        this.showMessage('Please enter a valid email', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          API_BASE + '/wallet/balance?email=' + encodeURIComponent(email),
+          {
+            headers: {
+              'x-shop-url': shop,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.currentEmail = email;
+          this.currentBalance = data.walletCoins || 0;
+          
+          // Try to find elements in both original and injected widget
+          let balanceEl = document.getElementById('wallet-embed-balance-display');
+          if (!balanceEl) {
+            balanceEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance-display');
+          }
+          
+          let balanceContainer = document.getElementById('wallet-embed-balance');
+          if (!balanceContainer) {
+            balanceContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance');
+          }
+          
+          let loginContainer = document.getElementById('wallet-embed-login');
+          if (!loginContainer) {
+            loginContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-login');
+          }
+          
+          if (balanceEl) balanceEl.textContent = this.currentBalance;
+          if (balanceContainer) balanceContainer.style.display = 'block';
+          if (loginContainer) loginContainer.style.display = 'none';
+          
+          this.showMessage('Balance loaded!', 'success');
+          console.log('[Wallet Widget] Balance loaded:', this.currentBalance, 'coins');
+        } else {
+          this.showMessage('Email not found', 'error');
+        }
+      } catch (err) {
+        this.showMessage('Network error', 'error');
+      }
+    }
+  };
+  
+  // Inject widget into cart drawer - works with any theme
+  function injectIntoCartDrawer() {
+    // Check if already injected
+    if (document.querySelector('#wallet-app-embed-injected')) {
+      console.log('[Wallet Widget] Already injected, skipping');
+      return true;
+    }
+    
+    // Try cart-discount first (preferred location)
+    const discountElement = document.querySelector('.cart-discount');
+    if (discountElement) {
+      const clone = embedEl.cloneNode(true);
+      clone.id = 'wallet-app-embed-injected';
+      clone.style.display = 'block';
+      clone.style.visibility = 'visible';
+      clone.style.opacity = '1';
+      
+      if (discountElement.nextSibling) {
+        discountElement.parentNode.insertBefore(clone, discountElement.nextSibling);
+      } else {
+        discountElement.parentNode.appendChild(clone);
+      }
+      
+      console.log('[Wallet Widget] Injected after .cart-discount');
+      return true;
+    }
+    
+    // Fallback: find any cart drawer/container
+    const cartSelectors = [
+      '.cart__footer',
+      '.cart-footer',
+      '[data-cart-footer]',
+      'cart-drawer',
+      '[data-cart-drawer]',
+      '.cart-drawer',
+      '#cart-drawer',
+      '.drawer--cart'
+    ];
+    
+    for (const selector of cartSelectors) {
+      const container = document.querySelector(selector);
+      if (container) {
+        const clone = embedEl.cloneNode(true);
+        clone.id = 'wallet-app-embed-injected';
+        clone.style.display = 'block';
+        clone.style.visibility = 'visible';
+        clone.style.opacity = '1';
+        
+        // Insert at the beginning of cart footer/drawer
+        if (container.firstChild) {
+          container.insertBefore(clone, container.firstChild);
+        } else {
+          container.appendChild(clone);
+        }
+        
+        console.log('[Wallet Widget] Injected into:', selector);
+        return true;
+      }
+    }
+    
+    console.log('[Wallet Widget] No cart container found');
+    return false;
+  }
+  
+  // Try injection on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('[Wallet Widget] DOM loaded, trying injection...');
+      injectIntoCartDrawer();
+    });
+  } else {
+    console.log('[Wallet Widget] Document ready, trying injection...');
+    injectIntoCartDrawer();
+  }
+  
+  // Also try when cart opens or updates
+  document.addEventListener('cart:open', function() {
+    console.log('[Wallet Widget] Cart opened');
+    setTimeout(injectIntoCartDrawer, 100);
+  });
+  
+  document.addEventListener('cart:updated', function() {
+    console.log('[Wallet Widget] Cart updated');
+    setTimeout(injectIntoCartDrawer, 100);
+  });
+  
+  // Watch for DOM changes (for dynamically loaded carts)
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes.length) {
+        mutation.addedNodes.forEach(function(node) {
+          if (node.nodeType === 1) {
+            // Check if cart-related element was added
+            if (node.classList && (
+              node.classList.contains('cart-drawer') ||
+              node.classList.contains('cart-discount') ||
+              node.id === 'cart-drawer' ||
+              node.id === 'cart'
+            )) {
+              console.log('[Wallet Widget] Cart element detected, injecting...');
+              setTimeout(injectIntoCartDrawer, 100);
+            } else if (node.querySelector) {
+              const hasCart = node.querySelector('.cart-drawer, .cart-discount, #cart-drawer, #cart');
+              if (hasCart) {
+                console.log('[Wallet Widget] Cart element found in subtree, injecting...');
+                setTimeout(injectIntoCartDrawer, 100);
+              }
+            }
+          }
+        });
+      }
+    });
+  });
+  
+  // Start observing
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+  
+  // Use event delegation for button clicks (works with cloned elements)
+  document.addEventListener('click', function(e) {
+    if (e.target && e.target.hasAttribute('data-wallet-action')) {
+      const action = e.target.getAttribute('data-wallet-action');
+      if (action === 'check-balance') {
+        console.log('[Wallet Widget] Check balance button clicked');
+        walletAppEmbed.checkBalance();
+      }
+    }
+  });
+  
+  console.log('[Wallet Widget] Initialized and watching for cart');
+})();
+</script>
+{% endif %}
