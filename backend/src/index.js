@@ -9,9 +9,9 @@ const path = require('path');
 // Load .env from the project root (two levels up from this file)
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-// Shopify integration routes
-const shopifyRoutes = require('./shopify/routes');
-app.use('/api/shopify', shopifyRoutes);
+// Shopify integration routes - DISABLED (causing deployment issues)
+// const shopifyRoutes = require('./shopify/routes');
+// app.use('/api/shopify', shopifyRoutes);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -513,6 +513,66 @@ app.post('/api/wallet/deduct', requireStorefrontAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// 5b. Create Discount Code (Storefront/Public)
+app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res) => {
+  try {
+    const { email, coinsToRedeem, discountAmount } = req.body;
+    const shopUrl = req.shopUrl;
+    
+    if (!email || !coinsToRedeem) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Missing required fields' 
+      });
+    }
+    
+    // Check if customer has enough coins
+    const walletCheck = await db.query(
+      'SELECT * FROM wallets WHERE customer_email = $1 AND store_url = $2',
+      [email, shopUrl]
+    );
+    
+    if (walletCheck.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Wallet not found'
+      });
+    }
+    
+    const wallet = walletCheck.rows[0];
+    const currentBalance = parseFloat(wallet.balance);
+    
+    if (currentBalance < coinsToRedeem) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Insufficient balance',
+        available: currentBalance
+      });
+    }
+    
+    // Create discount code
+    const emailHash = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+    const timestamp = Date.now().toString().slice(-6);
+    const discountCode = `WALLET-${emailHash}-${timestamp}`.substring(0, 25).toUpperCase();
+    
+    console.log(`[Wallet] Discount code generated: ${discountCode} for ${coinsToRedeem} coins ($${discountAmount})`);
+    
+    res.json({
+      success: true,
+      discountCode,
+      discountValue: discountAmount,
+      message: `Discount code created for ${coinsToRedeem} coins`
+    });
+    
+  } catch (error) {
+    console.error('[Wallet] Create discount error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to create discount code' 
+    });
   }
 });
 
