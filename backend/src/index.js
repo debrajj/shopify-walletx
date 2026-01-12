@@ -170,18 +170,40 @@ initDb();
 
 // For Public/Storefront APIs: Relies on 'x-shop-url' header
 const requireStorefrontAuth = async (req, res, next) => {
-  const shopUrl = req.headers['x-shop-url'] || req.query.shop;
+  let shopUrl = req.headers['x-shop-url'] || req.query.shop;
 
   if (!shopUrl) {
     return res.status(400).json({ error: 'Missing x-shop-url header or shop query param' });
   }
 
+  // Normalize shop URL - remove http:// or https://
+  shopUrl = shopUrl.replace(/^https?:\/\//, '');
+
   try {
-    const result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [shopUrl]);
+    // Try exact match first
+    let result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [shopUrl]);
+    
+    // If not found, try with https:// prefix
+    if (result.rows.length === 0) {
+      result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [`https://${shopUrl}`]);
+      if (result.rows.length > 0) {
+        shopUrl = `https://${shopUrl}`;
+      }
+    }
+    
+    // If still not found, try with http:// prefix
+    if (result.rows.length === 0) {
+      result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [`http://${shopUrl}`]);
+      if (result.rows.length > 0) {
+        shopUrl = `http://${shopUrl}`;
+      }
+    }
+    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Store not registered with ShopWallet' });
     }
-    req.shopUrl = shopUrl; // Attach tenant to request
+    
+    req.shopUrl = result.rows[0].store_url; // Use the actual store_url from database
     next();
   } catch (err) {
     console.error(err);
