@@ -1,0 +1,26 @@
+{
+  "name": "Wallet Balance Widget",
+  "target": "section",
+  "stylesheet": "wallet-widget.css",
+  "javascript": "wallet-widget.js",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Widget Title",
+      "default": "💰 Your Wallet"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_on_mobile",
+      "label": "Show on Mobile",
+      "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "Wallet Balance",
+      "category": "Custom"
+    }
+  ]
+}

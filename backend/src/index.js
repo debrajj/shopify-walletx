@@ -957,6 +957,144 @@ app.use('/api/shopify/coins', shopifyRoutes);
 
 console.log('Shopify coin integration routes mounted at /api/shopify/coins');
 
+// --- SHOPIFY SCRIPT TAG MANAGEMENT ---
+
+// Install wallet widget script tag
+app.post('/api/shopify/install-widget', async (req, res) => {
+  try {
+    const { shop } = req.body;
+    
+    if (!shop) {
+      return res.status(400).json({ error: 'Shop parameter is required' });
+    }
+
+    // Get shop's access token
+    const shopResult = await db.query('SELECT shopify_access_token FROM users WHERE store_url = $1', [shop]);
+    
+    if (shopResult.rows.length === 0 || !shopResult.rows[0].shopify_access_token) {
+      return res.status(404).json({ error: 'Shop not found or not authenticated' });
+    }
+
+    const accessToken = shopResult.rows[0].shopify_access_token;
+    const scriptTagUrl = 'https://shopify-walletx.onrender.com/widget.js';
+
+    // Check if script tag already exists
+    const checkResponse = await fetch(`https://${shop}/admin/api/2024-01/script_tags.json`, {
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const existingTags = await checkResponse.json();
+    const alreadyInstalled = existingTags.script_tags?.some(tag => tag.src === scriptTagUrl);
+
+    if (alreadyInstalled) {
+      return res.json({ success: true, message: 'Widget already installed', alreadyInstalled: true });
+    }
+
+    // Create script tag
+    const createResponse = await fetch(`https://${shop}/admin/api/2024-01/script_tags.json`, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        script_tag: {
+          event: 'onload',
+          src: scriptTagUrl,
+        },
+      }),
+    });
+
+    const result = await createResponse.json();
+
+    if (createResponse.ok) {
+      console.log(`✅ Widget script tag installed for: ${shop}`);
+      res.json({ success: true, message: 'Widget installed successfully', scriptTag: result.script_tag });
+    } else {
+      console.error('Failed to create script tag:', result);
+      res.status(400).json({ success: false, error: result.errors || 'Failed to install widget' });
+    }
+  } catch (err) {
+    console.error('Install widget error:', err);
+    res.status(500).json({ error: 'Server error installing widget' });
+  }
+});
+
+// Uninstall wallet widget script tag
+app.post('/api/shopify/uninstall-widget', async (req, res) => {
+  try {
+    const { shop } = req.body;
+    
+    if (!shop) {
+      return res.status(400).json({ error: 'Shop parameter is required' });
+    }
+
+    const shopResult = await db.query('SELECT shopify_access_token FROM users WHERE store_url = $1', [shop]);
+    
+    if (shopResult.rows.length === 0 || !shopResult.rows[0].shopify_access_token) {
+      return res.status(404).json({ error: 'Shop not found or not authenticated' });
+    }
+
+    const accessToken = shopResult.rows[0].shopify_access_token;
+    const scriptTagUrl = 'https://shopify-walletx.onrender.com/widget.js';
+
+    // Find script tag
+    const checkResponse = await fetch(`https://${shop}/admin/api/2024-01/script_tags.json`, {
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const existingTags = await checkResponse.json();
+    const scriptTag = existingTags.script_tags?.find(tag => tag.src === scriptTagUrl);
+
+    if (!scriptTag) {
+      return res.json({ success: true, message: 'Widget not installed', notFound: true });
+    }
+
+    // Delete script tag
+    const deleteResponse = await fetch(`https://${shop}/admin/api/2024-01/script_tags/${scriptTag.id}.json`, {
+      method: 'DELETE',
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+      },
+    });
+
+    if (deleteResponse.ok) {
+      console.log(`✅ Widget script tag uninstalled for: ${shop}`);
+      res.json({ success: true, message: 'Widget uninstalled successfully' });
+    } else {
+      res.status(400).json({ success: false, error: 'Failed to uninstall widget' });
+    }
+  } catch (err) {
+    console.error('Uninstall widget error:', err);
+    res.status(500).json({ error: 'Server error uninstalling widget' });
+  }
+});
+
+// Serve widget script
+app.get('/widget.js', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const scriptPath = path.join(__dirname, '../../extensions/wallet-script-tag/wallet-widget.js');
+  
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  
+  fs.readFile(scriptPath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading widget script:', err);
+      res.status(404).send('// Widget script not found');
+    } else {
+      res.send(data);
+    }
+  });
+});
+
 // --- SHOPIFY APP OAUTH ROUTES ---
 
 // Generate OAuth installation URL

@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import Reports from './pages/Reports';
 import Customers from './pages/Customers';
 import Automations from './pages/Automations';
+import WidgetInstaller from './pages/WidgetInstaller';
 import { ShopifyAuthCallback } from './src/pages/ShopifyAuthCallback';
 import { ShopifyInstall } from './src/pages/ShopifyInstall';
 
@@ -61,6 +62,7 @@ const TopNavigation: React.FC = () => {
               <NavTab to="/transactions" icon={Receipt} label="Transactions" />
               <NavTab to="/reports" icon={BarChart3} label="Reports" />
               <NavTab to="/automations" icon={Clock} label="Automations" />
+              <NavTab to="/widget" icon={Wallet} label="Widget" />
             </div>
           </div>
 
@@ -182,6 +184,7 @@ const App: React.FC = () => {
               <Route path="/transactions" element={<Transactions />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/automations" element={<Automations />} />
+              <Route path="/widget" element={<WidgetInstaller />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             

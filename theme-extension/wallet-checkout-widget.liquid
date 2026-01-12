@@ -1,0 +1,291 @@
+{% comment %}
+  Wallet Checkout Widget - Add to checkout.liquid or cart page
+  
+  Installation:
+  1. Go to: Online Store → Themes → Actions → Edit code
+  2. Create new snippet: wallet-checkout-widget.liquid
+  3. Paste this code
+  4. In checkout.liquid or cart.liquid, add: {% render 'wallet-checkout-widget' %}
+{% endcomment %}
+
+<div id="wallet-widget" style="margin: 20px 0; padding: 20px; border: 2px solid #e0e0e0; border-radius: 8px; background: #f9f9f9;">
+  <h3 style="margin: 0 0 15px 0; font-size: 20px;">💰 Use Your Wallet Coins</h3>
+  
+  <div id="wallet-step-phone" style="display: block;">
+    <p style="margin: 0 0 10px 0;">Enter your phone number to access your wallet</p>
+    <input 
+      type="tel" 
+      id="wallet-phone" 
+      placeholder="+1234567890"
+      style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;"
+    />
+    <button 
+      id="wallet-send-otp" 
+      onclick="sendWalletOTP()"
+      style="width: 100%; padding: 12px; background: #008060; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: 600;"
+    >
+      Send OTP
+    </button>
+  </div>
+
+  <div id="wallet-step-otp" style="display: none;">
+    <p style="margin: 0 0 10px 0;">Enter the OTP sent to your phone</p>
+    <input 
+      type="number" 
+      id="wallet-otp" 
+      placeholder="123456"
+      style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;"
+    />
+    <button 
+      id="wallet-verify-otp" 
+      onclick="verifyWalletOTP()"
+      style="width: 100%; padding: 12px; background: #008060; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: 600; margin-bottom: 10px;"
+    >
+      Verify OTP
+    </button>
+    <button 
+      onclick="showStep('phone')"
+      style="width: 100%; padding: 10px; background: transparent; color: #008060; border: 1px solid #008060; border-radius: 4px; font-size: 14px; cursor: pointer;"
+    >
+      Change Phone Number
+    </button>
+  </div>
+
+  <div id="wallet-step-wallet" style="display: none;">
+    <div style="padding: 15px; background: #e3f2fd; border-radius: 4px; margin-bottom: 15px;">
+      <p style="margin: 0; font-weight: 600;">Available Balance: <span id="wallet-balance">0</span> coins</p>
+    </div>
+    
+    <div id="wallet-has-balance" style="display: none;">
+      <input 
+        type="number" 
+        id="wallet-coins-to-use" 
+        placeholder="Enter coins to use"
+        style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;"
+      />
+      <button 
+        id="wallet-apply-coins" 
+        onclick="applyWalletCoins()"
+        style="width: 100%; padding: 12px; background: #008060; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: 600; margin-bottom: 10px;"
+      >
+        Apply Coins
+      </button>
+    </div>
+    
+    <div id="wallet-no-balance" style="display: none;">
+      <p style="margin: 0 0 10px 0; color: #666;">You don't have any coins in your wallet yet.</p>
+    </div>
+    
+    <button 
+      onclick="showStep('phone')"
+      style="width: 100%; padding: 10px; background: transparent; color: #008060; border: 1px solid #008060; border-radius: 4px; font-size: 14px; cursor: pointer;"
+    >
+      Use Different Phone
+    </button>
+  </div>
+
+  <div id="wallet-message" style="margin-top: 15px; padding: 10px; border-radius: 4px; display: none;"></div>
+  <div id="wallet-loading" style="display: none; text-align: center; padding: 20px;">
+    <div style="display: inline-block; width: 30px; height: 30px; border: 3px solid #f3f3f3; border-top: 3px solid #008060; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+  </div>
+</div>
+
+<style>
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  #wallet-widget button:hover {
+    opacity: 0.9;
+  }
+  
+  #wallet-widget button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+</style>
+
+<script>
+  const WALLET_API_BASE = 'https://shopify-walletx.onrender.com/api';
+  const SHOP_DOMAIN = '{{ shop.permanent_domain }}';
+  
+  let walletData = {
+    phone: '',
+    otpSessionId: '',
+    balance: 0
+  };
+
+  function showStep(step) {
+    document.getElementById('wallet-step-phone').style.display = step === 'phone' ? 'block' : 'none';
+    document.getElementById('wallet-step-otp').style.display = step === 'otp' ? 'block' : 'none';
+    document.getElementById('wallet-step-wallet').style.display = step === 'wallet' ? 'block' : 'none';
+    hideMessage();
+  }
+
+  function showMessage(message, type) {
+    const msgEl = document.getElementById('wallet-message');
+    msgEl.textContent = message;
+    msgEl.style.display = 'block';
+    msgEl.style.background = type === 'error' ? '#ffebee' : type === 'success' ? '#e8f5e9' : '#fff3e0';
+    msgEl.style.color = type === 'error' ? '#c62828' : type === 'success' ? '#2e7d32' : '#e65100';
+    msgEl.style.border = `1px solid ${type === 'error' ? '#ef5350' : type === 'success' ? '#66bb6a' : '#ffb74d'}`;
+  }
+
+  function hideMessage() {
+    document.getElementById('wallet-message').style.display = 'none';
+  }
+
+  function showLoading(show) {
+    document.getElementById('wallet-loading').style.display = show ? 'block' : 'none';
+    const buttons = document.querySelectorAll('#wallet-widget button');
+    buttons.forEach(btn => btn.disabled = show);
+  }
+
+  async function sendWalletOTP() {
+    const phone = document.getElementById('wallet-phone').value.trim();
+    
+    if (!phone) {
+      showMessage('Please enter your phone number', 'error');
+      return;
+    }
+
+    walletData.phone = phone;
+    showLoading(true);
+    hideMessage();
+
+    try {
+      const response = await fetch(`${WALLET_API_BASE}/otp/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-shop-url': SHOP_DOMAIN
+        },
+        body: JSON.stringify({ phone })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        walletData.otpSessionId = data.otpSessionId;
+        showStep('otp');
+        showMessage('OTP sent to your phone!', 'success');
+      } else {
+        showMessage(data.message || 'Failed to send OTP', 'error');
+      }
+    } catch (error) {
+      showMessage('Network error. Please try again.', 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function verifyWalletOTP() {
+    const otp = document.getElementById('wallet-otp').value.trim();
+    
+    if (!otp) {
+      showMessage('Please enter the OTP', 'error');
+      return;
+    }
+
+    showLoading(true);
+    hideMessage();
+
+    try {
+      const response = await fetch(`${WALLET_API_BASE}/otp/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-shop-url': SHOP_DOMAIN
+        },
+        body: JSON.stringify({
+          otpSessionId: walletData.otpSessionId,
+          otp: otp
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.verified) {
+        await fetchWalletBalance();
+        showStep('wallet');
+        showMessage('OTP verified! Your wallet is ready.', 'success');
+      } else {
+        showMessage('Invalid OTP. Please try again.', 'error');
+      }
+    } catch (error) {
+      showMessage('Network error. Please try again.', 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function fetchWalletBalance() {
+    try {
+      const response = await fetch(
+        `${WALLET_API_BASE}/wallet/balance?phone=${encodeURIComponent(walletData.phone)}`,
+        {
+          headers: {
+            'x-shop-url': SHOP_DOMAIN
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        walletData.balance = data.walletCoins || 0;
+        document.getElementById('wallet-balance').textContent = walletData.balance;
+        
+        if (walletData.balance > 0) {
+          document.getElementById('wallet-has-balance').style.display = 'block';
+          document.getElementById('wallet-no-balance').style.display = 'none';
+        } else {
+          document.getElementById('wallet-has-balance').style.display = 'none';
+          document.getElementById('wallet-no-balance').style.display = 'block';
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch wallet balance:', error);
+    }
+  }
+
+  async function applyWalletCoins() {
+    const coinsInput = document.getElementById('wallet-coins-to-use').value;
+    const coins = parseFloat(coinsInput);
+
+    if (!coins || coins <= 0) {
+      showMessage('Please enter a valid amount', 'error');
+      return;
+    }
+
+    if (coins > walletData.balance) {
+      showMessage(`You only have ${walletData.balance} coins available`, 'error');
+      return;
+    }
+
+    showLoading(true);
+    hideMessage();
+
+    try {
+      // Generate discount code
+      const phoneDigits = walletData.phone.replace(/\D/g, '');
+      const discountCode = `WALLET-${phoneDigits}-${coins}`;
+
+      // Apply discount code to cart
+      window.location.href = `/discount/${discountCode}?redirect=/checkout`;
+      
+      showMessage(`Applying ${coins} coins as discount...`, 'success');
+    } catch (error) {
+      showMessage('Failed to apply discount', 'error');
+      showLoading(false);
+    }
+  }
+
+  // Auto-fill phone if customer is logged in
+  {% if customer %}
+    {% if customer.phone %}
+      document.getElementById('wallet-phone').value = '{{ customer.phone }}';
+    {% endif %}
+  {% endif %}
+</script>
