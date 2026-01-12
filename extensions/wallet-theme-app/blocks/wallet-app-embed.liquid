@@ -247,25 +247,37 @@
     coinValue: 0.01, // 1 coin = $0.01
     
     getCartTotal: function() {
-      // Get cart total from Shopify cart object
-      if (window.Shopify && window.Shopify.cart) {
-        return window.Shopify.cart.total_price / 100; // Convert cents to dollars
-      }
-      // Fallback: try to find cart total in DOM
-      const cartTotalEl = document.querySelector('[data-cart-total], .cart__total, .cart-total');
-      if (cartTotalEl) {
-        const text = cartTotalEl.textContent.replace(/[^0-9.]/g, '');
-        return parseFloat(text) || 0;
-      }
-      return 0;
+      // Method 1: Try Shopify cart API (most reliable)
+      return fetch('/cart.js')
+        .then(res => res.json())
+        .then(cart => {
+          console.log('[Wallet Widget] Cart data:', cart);
+          return cart.total_price / 100; // Convert cents to dollars
+        })
+        .catch(err => {
+          console.error('[Wallet Widget] Cart fetch error:', err);
+          // Fallback: try window.Shopify object
+          if (window.Shopify && window.Shopify.cart) {
+            return window.Shopify.cart.total_price / 100;
+          }
+          return 0;
+        });
     },
     
-    updateCartDisplay: function() {
-      this.cartTotal = this.getCartTotal();
+    updateCartDisplay: async function() {
+      this.cartTotal = await this.getCartTotal();
       
       const cartTotalEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-cart-total');
       if (cartTotalEl) {
         cartTotalEl.textContent = '$' + this.cartTotal.toFixed(2);
+      }
+      
+      // Set max coins based on cart total
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      if (coinsInput) {
+        const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
+        coinsInput.setAttribute('max', maxCoins);
+        coinsInput.setAttribute('placeholder', 'Max: ' + maxCoins + ' coins');
       }
       
       this.updateNewTotal();
@@ -368,8 +380,8 @@
           if (balanceContainer) balanceContainer.style.display = 'block';
           if (loginContainer) loginContainer.style.display = 'none';
           
-          // Update cart display
-          this.updateCartDisplay();
+          // Update cart display (async)
+          await this.updateCartDisplay();
           
           // Set up coin input listener
           const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
@@ -559,7 +571,22 @@
   document.addEventListener('cart:updated', function() {
     console.log('[Wallet Widget] Cart updated');
     setTimeout(injectIntoCartDrawer, 100);
+    // Update cart total if widget is visible
+    if (window.walletAppEmbed && window.walletAppEmbed.currentEmail) {
+      setTimeout(() => window.walletAppEmbed.updateCartDisplay(), 200);
+    }
   });
+  
+  // Listen for Shopify cart changes
+  if (window.Shopify && window.Shopify.onCartUpdate) {
+    const originalOnCartUpdate = window.Shopify.onCartUpdate;
+    window.Shopify.onCartUpdate = function(cart) {
+      if (originalOnCartUpdate) originalOnCartUpdate(cart);
+      if (window.walletAppEmbed && window.walletAppEmbed.currentEmail) {
+        window.walletAppEmbed.updateCartDisplay();
+      }
+    };
+  }
   
   // Watch for DOM changes (for dynamically loaded carts)
   const observer = new MutationObserver(function(mutations) {
