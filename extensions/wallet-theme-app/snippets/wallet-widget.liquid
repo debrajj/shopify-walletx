@@ -1,0 +1,16 @@
+{% comment %}
+  Wallet Widget - App Embed
+  This will be available in Theme Customizer under App embeds
+{% endcomment %}
+
+<script>
+(function() {
+  if (window.walletWidgetLoaded) return;
+  window.walletWidgetLoaded = true;
+  
+  const script = document.createElement('script');
+  script.src = 'https://shopify-walletx.onrender.com/widget.js';
+  script.async = true;
+  document.head.appendChild(script);
+})();
+</script>
