@@ -36,7 +36,31 @@
     <div id="wallet-embed-balance" class="wallet-embed-balance" style="display: none;">
       <div class="wallet-embed-balance-display">
         <span class="wallet-embed-balance-amount" id="wallet-embed-balance-display">0</span>
-        <span class="wallet-embed-balance-label">coins</span>
+        <span class="wallet-embed-balance-label">coins available</span>
+      </div>
+      
+      <div class="wallet-embed-cart-info">
+        <div class="wallet-embed-row">
+          <span>Cart Total:</span>
+          <span id="wallet-embed-cart-total">$0.00</span>
+        </div>
+      </div>
+      
+      <div class="wallet-embed-apply-section">
+        <input 
+          type="number" 
+          id="wallet-embed-coins-input" 
+          placeholder="Coins to use"
+          class="wallet-embed-input"
+          min="0"
+        />
+        <div class="wallet-embed-row wallet-embed-new-total">
+          <span>New Total:</span>
+          <span id="wallet-embed-new-total">$0.00</span>
+        </div>
+        <button class="wallet-embed-button" data-wallet-action="apply-coins">
+          Apply Coins at Checkout
+        </button>
       </div>
     </div>
     
@@ -100,6 +124,32 @@
   .wallet-embed-balance-label {
     font-size: 14px;
     opacity: 0.9;
+  }
+
+  .wallet-embed-cart-info {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .wallet-embed-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .wallet-embed-new-total {
+    font-weight: 600;
+    font-size: 16px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .wallet-embed-apply-section {
+    margin-top: 12px;
   }
 
   .wallet-embed-input {
@@ -193,6 +243,53 @@
   window.walletAppEmbed = {
     currentEmail: '',
     currentBalance: 0,
+    cartTotal: 0,
+    coinValue: 0.01, // 1 coin = $0.01
+    
+    getCartTotal: function() {
+      // Get cart total from Shopify cart object
+      if (window.Shopify && window.Shopify.cart) {
+        return window.Shopify.cart.total_price / 100; // Convert cents to dollars
+      }
+      // Fallback: try to find cart total in DOM
+      const cartTotalEl = document.querySelector('[data-cart-total], .cart__total, .cart-total');
+      if (cartTotalEl) {
+        const text = cartTotalEl.textContent.replace(/[^0-9.]/g, '');
+        return parseFloat(text) || 0;
+      }
+      return 0;
+    },
+    
+    updateCartDisplay: function() {
+      this.cartTotal = this.getCartTotal();
+      
+      const cartTotalEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-cart-total');
+      if (cartTotalEl) {
+        cartTotalEl.textContent = '$' + this.cartTotal.toFixed(2);
+      }
+      
+      this.updateNewTotal();
+    },
+    
+    updateNewTotal: function() {
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      const newTotalEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-new-total');
+      
+      if (!coinsInput || !newTotalEl) return;
+      
+      const coinsToUse = parseInt(coinsInput.value) || 0;
+      const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
+      const actualCoins = Math.min(coinsToUse, maxCoins);
+      const discount = actualCoins * this.coinValue;
+      const newTotal = Math.max(0, this.cartTotal - discount);
+      
+      newTotalEl.textContent = '$' + newTotal.toFixed(2);
+      
+      // Update input if user entered more than allowed
+      if (coinsToUse > maxCoins) {
+        coinsInput.value = maxCoins;
+      }
+    },
     
     showMessage: function(text, type) {
       // Try to find message element in both original and injected widget
@@ -271,12 +368,81 @@
           if (balanceContainer) balanceContainer.style.display = 'block';
           if (loginContainer) loginContainer.style.display = 'none';
           
+          // Update cart display
+          this.updateCartDisplay();
+          
+          // Set up coin input listener
+          const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+          if (coinsInput) {
+            coinsInput.addEventListener('input', () => this.updateNewTotal());
+          }
+          
           this.showMessage('Balance loaded!', 'success');
           console.log('[Wallet Widget] Balance loaded:', this.currentBalance, 'coins');
         } else {
           this.showMessage('Email not found', 'error');
         }
       } catch (err) {
+        console.error('[Wallet Widget] Error:', err);
+        this.showMessage('Network error', 'error');
+      }
+    },
+    
+    applyCoins: async function() {
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      if (!coinsInput) {
+        this.showMessage('Error: Input not found', 'error');
+        return;
+      }
+      
+      const coinsToUse = parseInt(coinsInput.value) || 0;
+      
+      if (coinsToUse <= 0) {
+        this.showMessage('Please enter coins to use', 'error');
+        return;
+      }
+      
+      if (coinsToUse > this.currentBalance) {
+        this.showMessage('Not enough coins', 'error');
+        return;
+      }
+      
+      const maxCoins = Math.floor(this.cartTotal / this.coinValue);
+      if (coinsToUse > maxCoins) {
+        this.showMessage('Coins exceed cart total', 'error');
+        return;
+      }
+      
+      try {
+        // Create discount code
+        const discountAmount = coinsToUse * this.coinValue;
+        const response = await fetch(API_BASE + '/shopify/create-discount', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-shop-url': shop,
+          },
+          body: JSON.stringify({
+            email: this.currentEmail,
+            coinsToRedeem: coinsToUse,
+            discountAmount: discountAmount,
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.discountCode) {
+          this.showMessage('Redirecting to checkout...', 'success');
+          
+          // Redirect to checkout with discount code
+          setTimeout(() => {
+            window.location.href = '/checkout?discount=' + data.discountCode;
+          }, 1000);
+        } else {
+          this.showMessage(data.message || 'Failed to apply coins', 'error');
+        }
+      } catch (err) {
+        console.error('[Wallet Widget] Apply error:', err);
         this.showMessage('Network error', 'error');
       }
     }
@@ -350,17 +516,26 @@
   
   // Attach click handler directly to the button in the cloned widget
   function attachButtonHandler(clonedWidget) {
-    const button = clonedWidget.querySelector('[data-wallet-action="check-balance"]');
-    if (button) {
-      button.addEventListener('click', function(e) {
+    const checkButton = clonedWidget.querySelector('[data-wallet-action="check-balance"]');
+    if (checkButton) {
+      checkButton.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[Wallet Widget] Button clicked (direct handler)');
+        console.log('[Wallet Widget] Check balance clicked');
         walletAppEmbed.checkBalance();
       });
-      console.log('[Wallet Widget] Button handler attached');
-    } else {
-      console.error('[Wallet Widget] Button not found in cloned widget');
+      console.log('[Wallet Widget] Check balance handler attached');
+    }
+    
+    const applyButton = clonedWidget.querySelector('[data-wallet-action="apply-coins"]');
+    if (applyButton) {
+      applyButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Wallet Widget] Apply coins clicked');
+        walletAppEmbed.applyCoins();
+      });
+      console.log('[Wallet Widget] Apply coins handler attached');
     }
   }
   
@@ -428,11 +603,16 @@
     while (element && element !== document) {
       if (element.hasAttribute && element.hasAttribute('data-wallet-action')) {
         const action = element.getAttribute('data-wallet-action');
+        e.preventDefault();
+        e.stopPropagation();
+        
         if (action === 'check-balance') {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('[Wallet Widget] Button clicked (event delegation)');
+          console.log('[Wallet Widget] Check balance (delegation)');
           walletAppEmbed.checkBalance();
+          return;
+        } else if (action === 'apply-coins') {
+          console.log('[Wallet Widget] Apply coins (delegation)');
+          walletAppEmbed.applyCoins();
           return;
         }
       }
