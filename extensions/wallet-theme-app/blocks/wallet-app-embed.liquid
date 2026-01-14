@@ -17,49 +17,54 @@
 <div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}">
   <div class="wallet-embed-container">
     <div class="wallet-embed-header">
-      <span class="wallet-embed-icon">💰</span>
-      <span class="wallet-embed-title">Your Wallet</span>
+      <svg class="wallet-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M17 6V5C17 3.89543 16.1046 3 15 3H5C3.89543 3 3 3.89543 3 5V15C3 16.1046 3.89543 17 5 17H15C16.1046 17 17 16.1046 17 15V14M17 6H7C5.89543 6 5 6.89543 5 8V12C5 13.1046 5.89543 14 7 14H17M17 6V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="13" cy="10" r="1" fill="currentColor"/>
+      </svg>
+      <span class="wallet-embed-title">Wallet</span>
     </div>
     
     <div id="wallet-embed-login" class="wallet-embed-login">
       <input 
         type="email" 
         id="wallet-embed-email" 
-        placeholder="Enter your email"
+        placeholder="Email address"
         class="wallet-embed-input"
       />
       <button class="wallet-embed-button" data-wallet-action="check-balance">
-        Check Balance
+        Check balance
       </button>
     </div>
     
     <div id="wallet-embed-balance" class="wallet-embed-balance" style="display: none;">
-      <div class="wallet-embed-balance-display">
-        <span class="wallet-embed-balance-amount" id="wallet-embed-balance-display">0</span>
-        <span class="wallet-embed-balance-label">coins available</span>
-      </div>
-      
-      <div class="wallet-embed-cart-info">
-        <div class="wallet-embed-row">
-          <span>Cart Total:</span>
-          <span id="wallet-embed-cart-total">$0.00</span>
+      <div class="wallet-balance-info">
+        <div class="wallet-balance-row">
+          <span class="wallet-label">Available balance</span>
+          <span class="wallet-value" id="wallet-embed-balance-display">0 coins</span>
+        </div>
+        <div class="wallet-balance-row">
+          <span class="wallet-label">Cart total</span>
+          <span class="wallet-value" id="wallet-embed-cart-total">$0.00</span>
         </div>
       </div>
       
-      <div class="wallet-embed-apply-section">
+      <div class="wallet-apply-section">
+        <label class="wallet-input-label" for="wallet-embed-coins-input">
+          Coins to redeem
+        </label>
         <input 
           type="number" 
           id="wallet-embed-coins-input" 
-          placeholder="Coins to use"
+          placeholder="0"
           class="wallet-embed-input"
           min="0"
         />
-        <div class="wallet-embed-row wallet-embed-new-total">
-          <span>New Total:</span>
-          <span id="wallet-embed-new-total">$0.00</span>
+        <div class="wallet-new-total">
+          <span class="wallet-label">New total</span>
+          <span class="wallet-value-large" id="wallet-embed-new-total">$0.00</span>
         </div>
-        <button class="wallet-embed-button" data-wallet-action="apply-coins">
-          Apply Coins at Checkout
+        <button class="wallet-embed-button wallet-button-primary" data-wallet-action="apply-coins">
+          Apply & checkout
         </button>
       </div>
     </div>
@@ -70,127 +75,153 @@
 
 <style>
   .wallet-app-embed {
-    padding: 16px;
-    margin: 12px 0;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 0;
+    margin: 16px 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 
   .wallet-embed-container {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #e3e3e3;
+    border-radius: 8px;
     padding: 16px;
-    color: white;
   }
 
   .wallet-embed-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e3e3e3;
   }
 
-  .wallet-embed-icon {
-    font-size: 20px;
+  .wallet-icon {
+    color: #202223;
+    flex-shrink: 0;
   }
 
   .wallet-embed-title {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
+    color: #202223;
+    letter-spacing: -0.01em;
+  }
+
+  .wallet-embed-login {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .wallet-embed-balance {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-    margin-top: 12px;
-    backdrop-filter: blur(10px);
-  }
-
-  .wallet-embed-balance-display {
     display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 6px;
+    flex-direction: column;
+    gap: 16px;
   }
 
-  .wallet-embed-balance-amount {
-    font-size: 36px;
-    font-weight: 700;
-    line-height: 1;
+  .wallet-balance-info {
+    background: #f6f6f7;
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
-  .wallet-embed-balance-label {
-    font-size: 14px;
-    opacity: 0.9;
-  }
-
-  .wallet-embed-cart-info {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255,255,255,0.2);
-  }
-
-  .wallet-embed-row {
+  .wallet-balance-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
-    font-size: 14px;
   }
 
-  .wallet-embed-new-total {
+  .wallet-label {
+    font-size: 13px;
+    color: #6d7175;
+    font-weight: 400;
+  }
+
+  .wallet-value {
+    font-size: 13px;
+    color: #202223;
     font-weight: 600;
-    font-size: 16px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid rgba(255,255,255,0.2);
   }
 
-  .wallet-embed-apply-section {
-    margin-top: 12px;
+  .wallet-value-large {
+    font-size: 16px;
+    color: #202223;
+    font-weight: 600;
+  }
+
+  .wallet-apply-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .wallet-input-label {
+    font-size: 13px;
+    color: #202223;
+    font-weight: 500;
+    margin-bottom: -8px;
+  }
+
+  .wallet-new-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f6f6f7;
+    border-radius: 6px;
   }
 
   .wallet-embed-input {
     width: 100%;
     padding: 10px 12px;
-    border: 2px solid rgba(255,255,255,0.3);
+    border: 1px solid #c9cccf;
     border-radius: 6px;
     font-size: 14px;
-    background: rgba(255,255,255,0.1);
-    color: white;
-    margin-bottom: 8px;
+    background: #ffffff;
+    color: #202223;
     box-sizing: border-box;
+    transition: border-color 0.15s ease;
   }
 
   .wallet-embed-input::placeholder {
-    color: rgba(255,255,255,0.6);
+    color: #8c9196;
+  }
+
+  .wallet-embed-input:hover {
+    border-color: #8c9196;
   }
 
   .wallet-embed-input:focus {
     outline: none;
-    border-color: rgba(255,255,255,0.6);
-    background: rgba(255,255,255,0.15);
+    border-color: #005bd3;
+    box-shadow: 0 0 0 1px #005bd3;
   }
 
   .wallet-embed-button {
     width: 100%;
-    padding: 12px;
-    background: white;
-    color: #667eea;
-    border: none;
+    padding: 11px 16px;
+    background: #ffffff;
+    color: #202223;
+    border: 1px solid #c9cccf;
     border-radius: 6px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 8px;
+    transition: all 0.15s ease;
+    text-align: center;
   }
 
   .wallet-embed-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    background: #f6f6f7;
+    border-color: #8c9196;
+  }
+
+  .wallet-embed-button:active {
+    background: #e3e3e3;
   }
 
   .wallet-embed-button:disabled {
@@ -198,22 +229,42 @@
     cursor: not-allowed;
   }
 
+  .wallet-button-primary {
+    background: #202223;
+    color: #ffffff;
+    border-color: #202223;
+  }
+
+  .wallet-button-primary:hover {
+    background: #2c2e2f;
+    border-color: #2c2e2f;
+  }
+
+  .wallet-button-primary:active {
+    background: #44474a;
+  }
+
   .wallet-embed-message {
-    margin-top: 8px;
-    padding: 8px;
+    margin-top: 12px;
+    padding: 10px 12px;
     border-radius: 6px;
-    font-size: 12px;
-    text-align: center;
+    font-size: 13px;
+    line-height: 1.4;
+    display: none;
   }
 
   .wallet-embed-message.success {
-    background: rgba(76, 175, 80, 0.3);
-    border: 1px solid rgba(76, 175, 80, 0.5);
+    background: #d1f7c4;
+    color: #0f5132;
+    border: 1px solid #9dd084;
+    display: block;
   }
 
   .wallet-embed-message.error {
-    background: rgba(244, 67, 54, 0.3);
-    border: 1px solid rgba(244, 67, 54, 0.5);
+    background: #fed3d1;
+    color: #8a1f11;
+    border: 1px solid #fea39e;
+    display: block;
   }
 
   /* Hide the original embed element */
@@ -279,8 +330,8 @@
       const balanceContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance');
       const loginContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-login');
       
-      if (balanceEl) balanceEl.textContent = balance;
-      if (balanceContainer) balanceContainer.style.display = 'block';
+      if (balanceEl) balanceEl.textContent = balance + ' coins';
+      if (balanceContainer) balanceContainer.style.display = 'flex';
       if (loginContainer) loginContainer.style.display = 'none';
       
       // Update cart display
@@ -390,9 +441,11 @@
       }
       msgEl.textContent = text;
       msgEl.className = 'wallet-embed-message ' + type;
+      msgEl.style.display = 'block';
       setTimeout(() => {
         msgEl.textContent = '';
         msgEl.className = 'wallet-embed-message';
+        msgEl.style.display = 'none';
       }, 4000);
     },
     
