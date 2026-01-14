@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const db = require('./config/db');
 const path = require('path');
+const { createShopifyDiscount } = require('./shopify/discountService');
 
 // Load .env from the project root (two levels up from this file)
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -553,22 +554,29 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
       });
     }
     
-    // Create discount code
-    const emailHash = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-    const timestamp = Date.now().toString().slice(-6);
-    const discountCode = `WALLET-${emailHash}-${timestamp}`.substring(0, 25).toUpperCase();
+    // Create Shopify discount code
+    const discountResult = await createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmount);
     
-    console.log(`[Wallet] Discount code generated: ${discountCode} for ${coinsToRedeem} coins ($${discountAmount})`);
+    if (discountResult.success) {
+      // Deduct coins immediately
+      const newBalance = currentBalance - coinsToRedeem;
+      await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2', [newBalance, wallet.id]);
+      
+      // Log transaction
+      await db.query(`
+        INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status)
+        VALUES ($1, $2, $3, $4, 'DEBIT', 'PENDING')
+      `, [wallet.id, shopUrl, discountResult.discountCode, coinsToRedeem]);
+      
+      return res.json({
+        ...discountResult,
+        newBalance
+      });
+    }
     
-    res.json({
-      success: true,
-      discountCode,
-      discountValue: discountAmount,
-      message: `Discount code created for ${coinsToRedeem} coins`
-    });
+    // Return result (may require manual setup)
+    res.json(discountResult);
     
-  } catch (error) {
-    console.error('[Wallet] Create discount error:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to create discount code' 
