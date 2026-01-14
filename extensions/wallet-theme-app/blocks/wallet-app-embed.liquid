@@ -647,6 +647,34 @@
     }
   }, true); // Use capture phase
   
+  // Auto-check balance for logged-in customers
+  function autoCheckBalance() {
+    {% if customer %}
+      const customerEmail = {{ customer.email | json }};
+      console.log('[Wallet Widget] Auto-checking balance for logged-in customer:', customerEmail);
+      
+      // Wait for widget to be injected
+      setTimeout(function() {
+        const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+        if (emailInput && customerEmail) {
+          emailInput.value = customerEmail;
+          // Trigger balance check automatically
+          walletAppEmbed.checkBalance();
+        }
+      }, 500);
+    {% else %}
+      console.log('[Wallet Widget] No customer logged in, manual email entry required');
+    {% endif %}
+  }
+  
+  // Run auto-check after injection attempts
+  setTimeout(autoCheckBalance, 600);
+  
+  // Also run when cart opens
+  document.addEventListener('cart:open', function() {
+    setTimeout(autoCheckBalance, 200);
+  });
+  
   console.log('[Wallet Widget] Initialized and watching for cart');
 })();
 </script>
