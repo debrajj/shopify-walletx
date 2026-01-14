@@ -495,15 +495,32 @@
         
         const data = await response.json();
         
+        console.log('[Wallet Widget] Discount response:', data);
+        
         if (data.success && data.discountCode) {
-          this.showMessage('Redirecting to checkout...', 'success');
+          // Update balance if coins were deducted
+          if (data.newBalance !== undefined) {
+            this.currentBalance = data.newBalance;
+            localStorage.setItem('walletBalance', this.currentBalance);
+            this.displayBalance(this.currentBalance);
+          }
           
-          // Redirect to checkout with discount code
-          setTimeout(() => {
-            window.location.href = '/checkout?discount=' + data.discountCode;
-          }, 1000);
+          if (data.requiresManualSetup) {
+            this.showMessage(`Code: ${data.discountCode} - Apply at checkout`, 'success');
+            // Still redirect but show message
+            setTimeout(() => {
+              window.location.href = '/checkout?discount=' + data.discountCode;
+            }, 2000);
+          } else {
+            this.showMessage('Redirecting to checkout...', 'success');
+            setTimeout(() => {
+              window.location.href = '/checkout?discount=' + data.discountCode;
+            }, 1000);
+          }
         } else {
-          this.showMessage(data.message || 'Failed to apply coins', 'error');
+          const errorMsg = data.message || data.error || 'Failed to apply coins';
+          console.error('[Wallet Widget] Discount error:', data);
+          this.showMessage(errorMsg, 'error');
         }
       } catch (err) {
         console.error('[Wallet Widget] Apply error:', err);

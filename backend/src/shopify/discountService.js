@@ -16,12 +16,15 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     const shopResult = await db.query('SELECT shopify_access_token FROM users WHERE store_url = $1', [shopUrl]);
     
     if (shopResult.rows.length === 0 || !shopResult.rows[0].shopify_access_token) {
-      console.warn(`[Discount] No Shopify access token for ${shopUrl}`);
+      console.warn(`[Discount] No Shopify access token for ${shopUrl} - using simple code`);
+      
+      // Return simple discount code that merchant can manually create
       return {
-        success: false,
+        success: true,
         discountCode,
+        discountValue: discountAmount,
         requiresManualSetup: true,
-        message: 'Shopify not connected - manual discount setup required'
+        message: `Use code ${discountCode} at checkout (merchant must create this discount manually in Shopify admin)`
       };
     }
     
