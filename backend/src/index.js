@@ -577,6 +577,8 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
     // Return result (may require manual setup)
     res.json(discountResult);
     
+  } catch (error) {
+    console.error('[Wallet] Create discount error:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to create discount code' 
