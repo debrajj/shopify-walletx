@@ -1,0 +1,494 @@
+{% schema %}
+{
+  "name": "Wallet Portal",
+  "target": "section",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Enable Wallet Portal",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
+
+{% if block.settings.enabled %}
+<div id="wallet-portal" class="wallet-portal" data-shop="{{ shop.permanent_domain }}">
+  <div class="wallet-portal-container">
+    <h1 class="wallet-portal-title">My Wallet</h1>
+    
+    <!-- Login Section -->
+    <div id="wallet-portal-login" class="wallet-portal-section">
+      <div class="wallet-card">
+        <h2>Access Your Wallet</h2>
+        <input 
+          type="email" 
+          id="wallet-portal-email" 
+          placeholder="Enter your email"
+          class="wallet-input"
+        />
+        <button class="wallet-button" onclick="walletPortal.loadWallet()">
+          View My Wallet
+        </button>
+      </div>
+    </div>
+    
+    <!-- Wallet Dashboard -->
+    <div id="wallet-portal-dashboard" class="wallet-portal-section" style="display: none;">
+      <!-- Balance Card -->
+      <div class="wallet-card wallet-balance-card">
+        <div class="wallet-balance-header">
+          <span class="wallet-icon">💰</span>
+          <div>
+            <h3>Available Balance</h3>
+            <div class="wallet-balance-amount" id="wallet-balance">0</div>
+            <p class="wallet-balance-label">coins</p>
+          </div>
+        </div>
+        <div class="wallet-tier-badge" id="wallet-tier">BRONZE</div>
+      </div>
+      
+      <!-- Stats Grid -->
+      <div class="wallet-stats-grid">
+        <div class="wallet-stat-card">
+          <div class="wallet-stat-value" id="wallet-total-spent">$0</div>
+          <div class="wallet-stat-label">Total Spent</div>
+        </div>
+        <div class="wallet-stat-card">
+          <div class="wallet-stat-value" id="wallet-total-orders">0</div>
+          <div class="wallet-stat-label">Total Orders</div>
+        </div>
+      </div>
+      
+      <!-- Referral Section -->
+      <div class="wallet-card">
+        <h3>Refer a Friend</h3>
+        <p>Share your referral code and earn coins when they make a purchase!</p>
+        <div class="wallet-referral-code-container">
+          <input 
+            type="text" 
+            id="wallet-referral-code" 
+            readonly 
+            class="wallet-referral-input"
+          />
+          <button class="wallet-button-small" onclick="walletPortal.copyReferralCode()">
+            Copy
+          </button>
+        </div>
+        <div id="wallet-copy-message" class="wallet-message"></div>
+      </div>
+      
+      <!-- Transactions -->
+      <div class="wallet-card">
+        <h3>Recent Transactions</h3>
+        <div id="wallet-transactions" class="wallet-transactions-list">
+          <p class="wallet-empty-state">No transactions yet</p>
+        </div>
+      </div>
+      
+      <!-- Rewards Info -->
+      <div class="wallet-card">
+        <h3>How to Earn Coins</h3>
+        <div class="wallet-rewards-list">
+          <div class="wallet-reward-item">
+            <span class="wallet-reward-icon">🛍️</span>
+            <div>
+              <strong>Make a Purchase</strong>
+              <p id="wallet-reward-purchase">Earn coins on every order</p>
+            </div>
+          </div>
+          <div class="wallet-reward-item">
+            <span class="wallet-reward-icon">👥</span>
+            <div>
+              <strong>Refer Friends</strong>
+              <p id="wallet-reward-referral">Get coins when they buy</p>
+            </div>
+          </div>
+          <div class="wallet-reward-item">
+            <span class="wallet-reward-icon">🎂</span>
+            <div>
+              <strong>Birthday Bonus</strong>
+              <p id="wallet-reward-birthday">Special coins on your birthday</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wallet-portal {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  .wallet-portal-title {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 30px;
+    color: #1a1a1a;
+  }
+  
+  .wallet-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+  }
+  
+  .wallet-card h2, .wallet-card h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #1a1a1a;
+  }
+  
+  .wallet-balance-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    position: relative;
+  }
+  
+  .wallet-balance-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  .wallet-icon {
+    font-size: 48px;
+  }
+  
+  .wallet-balance-amount {
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1;
+    margin: 8px 0;
+  }
+  
+  .wallet-balance-label {
+    font-size: 14px;
+    opacity: 0.9;
+    margin: 0;
+  }
+  
+  .wallet-tier-badge {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    background: rgba(255,255,255,0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  
+  .wallet-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .wallet-stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+  
+  .wallet-stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 8px;
+  }
+  
+  .wallet-stat-label {
+    font-size: 14px;
+    color: #666;
+  }
+  
+  .wallet-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+  }
+  
+  .wallet-input:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+  
+  .wallet-button {
+    width: 100%;
+    padding: 14px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .wallet-button:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+  }
+  
+  .wallet-button-small {
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  
+  .wallet-referral-code-container {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  .wallet-referral-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    background: #f5f5f5;
+  }
+  
+  .wallet-transactions-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .wallet-transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .wallet-transaction-item:last-child {
+    border-bottom: none;
+  }
+  
+  .wallet-transaction-type {
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  
+  .wallet-transaction-date {
+    font-size: 12px;
+    color: #999;
+  }
+  
+  .wallet-transaction-amount {
+    font-weight: 700;
+    font-size: 18px;
+  }
+  
+  .wallet-transaction-amount.credit {
+    color: #4caf50;
+  }
+  
+  .wallet-transaction-amount.debit {
+    color: #f44336;
+  }
+  
+  .wallet-rewards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .wallet-reward-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .wallet-reward-icon {
+    font-size: 32px;
+  }
+  
+  .wallet-reward-item strong {
+    display: block;
+    margin-bottom: 4px;
+    color: #1a1a1a;
+  }
+  
+  .wallet-reward-item p {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+  }
+  
+  .wallet-message {
+    margin-top: 12px;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    text-align: center;
+  }
+  
+  .wallet-message.success {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+  
+  .wallet-empty-state {
+    text-align: center;
+    color: #999;
+    padding: 40px 20px;
+  }
+</style>
+
+<script>
+(function() {
+  const API_BASE = 'https://shopify-walletx.onrender.com/api';
+  const shop = document.getElementById('wallet-portal').dataset.shop;
+  
+  window.walletPortal = {
+    currentEmail: '',
+    
+    init: function() {
+      // Check if customer is logged in
+      {% if customer %}
+        const customerEmail = {{ customer.email | json }};
+        document.getElementById('wallet-portal-email').value = customerEmail;
+        this.loadWallet();
+      {% endif %}
+      
+      // Load reward info
+      this.loadRewardInfo();
+    },
+    
+    loadWallet: async function() {
+      const email = document.getElementById('wallet-portal-email').value.trim();
+      
+      if (!email || !email.includes('@')) {
+        alert('Please enter a valid email');
+        return;
+      }
+      
+      this.currentEmail = email;
+      
+      try {
+        const response = await fetch(
+          `${API_BASE}/customer/wallet/${encodeURIComponent(email)}?shop=${shop}`
+        );
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Update UI
+          document.getElementById('wallet-balance').textContent = data.balance;
+          document.getElementById('wallet-tier').textContent = data.tier;
+          document.getElementById('wallet-total-spent').textContent = '$' + data.totalSpent.toFixed(2);
+          document.getElementById('wallet-total-orders').textContent = data.totalOrders;
+          document.getElementById('wallet-referral-code').value = data.referralCode || 'Loading...';
+          
+          // Show transactions
+          this.displayTransactions(data.transactions);
+          
+          // Show dashboard, hide login
+          document.getElementById('wallet-portal-login').style.display = 'none';
+          document.getElementById('wallet-portal-dashboard').style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Error loading wallet:', error);
+        alert('Failed to load wallet. Please try again.');
+      }
+    },
+    
+    displayTransactions: function(transactions) {
+      const container = document.getElementById('wallet-transactions');
+      
+      if (!transactions || transactions.length === 0) {
+        container.innerHTML = '<p class="wallet-empty-state">No transactions yet</p>';
+        return;
+      }
+      
+      container.innerHTML = transactions.map(txn => {
+        const date = new Date(txn.created_at).toLocaleDateString();
+        const isCredit = txn.type === 'CREDIT';
+        const sign = isCredit ? '+' : '-';
+        const className = isCredit ? 'credit' : 'debit';
+        
+        return `
+          <div class="wallet-transaction-item">
+            <div>
+              <div class="wallet-transaction-type">${txn.order_id || 'Transaction'}</div>
+              <div class="wallet-transaction-date">${date}</div>
+            </div>
+            <div class="wallet-transaction-amount ${className}">
+              ${sign}${txn.coins}
+            </div>
+          </div>
+        `;
+      }).join('');
+    },
+    
+    loadRewardInfo: async function() {
+      try {
+        const response = await fetch(`${API_BASE}/customer/rewards/info?shop=${shop}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          document.getElementById('wallet-reward-purchase').textContent = 
+            `Earn ${data.rewardPerDollar} coin per $1 spent`;
+          document.getElementById('wallet-reward-referral').textContent = 
+            `Earn ${data.referralReward} coins per referral`;
+          document.getElementById('wallet-reward-birthday').textContent = 
+            `Get ${data.birthdayReward} coins on your birthday`;
+        }
+      } catch (error) {
+        console.error('Error loading reward info:', error);
+      }
+    },
+    
+    copyReferralCode: function() {
+      const input = document.getElementById('wallet-referral-code');
+      input.select();
+      document.execCommand('copy');
+      
+      const message = document.getElementById('wallet-copy-message');
+      message.textContent = 'Referral code copied!';
+      message.className = 'wallet-message success';
+      
+      setTimeout(() => {
+        message.textContent = '';
+        message.className = 'wallet-message';
+      }, 3000);
+    }
+  };
+  
+  // Initialize on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => walletPortal.init());
+  } else {
+    walletPortal.init();
+  }
+})();
+</script>
+{% endif %}

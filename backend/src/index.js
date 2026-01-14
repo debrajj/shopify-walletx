@@ -6,6 +6,8 @@ const fs = require('fs');
 const db = require('./config/db');
 const path = require('path');
 const { createShopifyDiscount } = require('./shopify/discountService');
+const rewardService = require('./services/rewardService');
+const customerPortalRoutes = require('./routes/customerPortal');
 
 // Load .env from the project root (two levels up from this file)
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -27,6 +29,9 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
+
+// Mount customer portal routes
+app.use('/api/customer', customerPortalRoutes);
 
 // --- DATABASE INIT (SaaS Schema) ---
 const initDb = async () => {
@@ -641,7 +646,7 @@ app.post('/webhooks/orders/paid', async (req, res) => {
     const shopDomain = req.headers['x-shopify-shop-domain'];
     if (!shopDomain) {
         console.warn('Webhook missing shop domain header');
-        return res.status(200).send('OK'); // Return 200 to Shopify anyway
+        return res.status(200).send('OK');
     }
 
     const order = req.body;
@@ -654,22 +659,29 @@ app.post('/webhooks/orders/paid', async (req, res) => {
          return res.status(200).send('OK');
     }
 
-    // Check for wallet discount codes
+    const customerEmail = order.customer?.email || order.email;
+    const orderTotal = parseFloat(order.total_price || 0);
+    const orderId = order.id ? order.id.toString() : '';
+
+    // 1. Award purchase rewards
+    if (customerEmail && orderTotal > 0) {
+      await rewardService.awardPurchaseReward(shopDomain, customerEmail, orderTotal, orderId);
+      await rewardService.updateCustomerTier(shopDomain, customerEmail, orderTotal);
+    }
+
+    // 2. Check for wallet discount codes (coin redemption)
     const discountCodes = order.discount_codes || [];
-    const walletCode = discountCodes.find(c => c.code.startsWith('WALLET-'));
+    const walletCode = discountCodes.find(c => c.code.startsWith('WALLET'));
 
     if (walletCode) {
-      const phone = walletCode.code.replace('WALLET-', ''); // Simple parsing strategy
       const amount = parseFloat(walletCode.amount || 0);
 
-      if (amount > 0) {
-        // Find Wallet
-        const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [phone, shopDomain]);
+      if (amount > 0 && customerEmail) {
+        const walletRes = await db.query('SELECT * FROM wallets WHERE customer_email = $1 AND store_url = $2', [customerEmail, shopDomain]);
         if (walletRes.rows.length > 0) {
            const wallet = walletRes.rows[0];
            
-           const orderIdStr = order.id ? order.id.toString() : '';
-           const txnCheck = await db.query('SELECT * FROM transactions WHERE order_id = $1 AND type = \'DEBIT\' AND store_url = $2', [orderIdStr, shopDomain]);
+           const txnCheck = await db.query('SELECT * FROM transactions WHERE order_id = $1 AND type = \'DEBIT\' AND store_url = $2', [orderId, shopDomain]);
            
            if (txnCheck.rows.length === 0) {
               const newBalance = parseFloat(wallet.balance) - amount;
@@ -678,11 +690,19 @@ app.post('/webhooks/orders/paid', async (req, res) => {
               await db.query(`
                 INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status, order_amount)
                 VALUES ($1, $2, $3, $4, 'DEBIT', 'COMPLETED', $5)
-              `, [wallet.id, shopDomain, orderIdStr, amount, parseFloat(order.total_price)]);
+              `, [wallet.id, shopDomain, orderId, amount, orderTotal]);
               
-              console.log(`Deducted ${amount} coins from ${phone} for order ${orderIdStr}`);
+              console.log(`Deducted ${amount} coins from ${customerEmail} for order ${orderId}`);
            }
         }
+      }
+    }
+
+    // 3. Check for referral code in order notes or tags
+    if (order.note && order.note.includes('REF:')) {
+      const referralCode = order.note.match(/REF:(\w+)/)?.[1];
+      if (referralCode && customerEmail) {
+        await rewardService.processReferral(shopDomain, referralCode, customerEmail);
       }
     }
 
@@ -831,6 +851,18 @@ app.get('/api/settings', requireAdminAuth, async (req, res) => {
         walletBalanceUrl: row.custom_api_wallet_balance_url,
         authHeaderKey: row.custom_api_auth_header_key,
         authHeaderValue: row.custom_api_auth_header_value
+      },
+      rewards: {
+        rewardPerDollar: parseFloat(row.reward_per_dollar || 1),
+        welcomeBonus: parseInt(row.welcome_bonus || 500),
+        minOrderForRewards: parseFloat(row.min_order_for_rewards || 0),
+        referralReward: parseInt(row.referral_reward || 100),
+        reviewReward: parseInt(row.review_reward || 50),
+        birthdayReward: parseInt(row.birthday_reward || 100),
+        enableAutoRewards: row.enable_auto_rewards !== false,
+        enableWelcomeBonus: row.enable_welcome_bonus !== false,
+        enableReferrals: row.enable_referrals === true,
+        coinExpiryDays: parseInt(row.coin_expiry_days || 0)
       }
     });
   } catch (err) {
@@ -854,16 +886,37 @@ app.put('/api/settings', requireAdminAuth, async (req, res) => {
         use_custom_api = $7,
         custom_api_wallet_balance_url = $8,
         custom_api_auth_header_key = $9,
-        custom_api_auth_header_value = $10
-      WHERE store_url = $11
+        custom_api_auth_header_value = $10,
+        reward_per_dollar = $11,
+        welcome_bonus = $12,
+        min_order_for_rewards = $13,
+        referral_reward = $14,
+        review_reward = $15,
+        birthday_reward = $16,
+        enable_auto_rewards = $17,
+        enable_welcome_bonus = $18,
+        enable_referrals = $19,
+        coin_expiry_days = $20
+      WHERE store_url = $21
     `, [
       s.isWalletEnabled, s.isOtpEnabled, s.otpExpirySeconds, s.maxWalletUsagePercent,
       s.smsProvider, s.smsApiKey, s.useCustomApi, 
       s.customApiConfig.walletBalanceUrl, s.customApiConfig.authHeaderKey, s.customApiConfig.authHeaderValue,
+      s.rewards?.rewardPerDollar || 1,
+      s.rewards?.welcomeBonus || 500,
+      s.rewards?.minOrderForRewards || 0,
+      s.rewards?.referralReward || 100,
+      s.rewards?.reviewReward || 50,
+      s.rewards?.birthdayReward || 100,
+      s.rewards?.enableAutoRewards !== false,
+      s.rewards?.enableWelcomeBonus !== false,
+      s.rewards?.enableReferrals === true,
+      s.rewards?.coinExpiryDays || 0,
       shopUrl
     ]);
     res.json(s);
   } catch (err) {
+    console.error('Settings update error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
