@@ -30,6 +30,7 @@
         id="wallet-embed-email" 
         placeholder="Email address"
         class="wallet-embed-input"
+        autocomplete="email"
       />
       <button class="wallet-embed-button" data-wallet-action="check-balance">
         Check balance
@@ -670,6 +671,29 @@
         walletAppEmbed.applyCoins();
       });
       console.log('[Wallet Widget] Apply coins handler attached');
+    }
+    
+    // Add email input listeners for instant check
+    const emailInput = clonedWidget.querySelector('#wallet-embed-email');
+    if (emailInput) {
+      // Check on Enter key
+      emailInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          walletAppEmbed.checkBalance();
+        }
+      });
+      
+      // Auto-check on blur (when user clicks away)
+      emailInput.addEventListener('blur', function() {
+        const email = emailInput.value.trim();
+        if (email && email.includes('@')) {
+          console.log('[Wallet Widget] Auto-checking balance on blur');
+          walletAppEmbed.checkBalance();
+        }
+      });
+      
+      console.log('[Wallet Widget] Email input listeners attached');
     }
   }
   
