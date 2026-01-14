@@ -246,6 +246,81 @@
     cartTotal: 0,
     coinValue: 0.01, // 1 coin = $0.01
     
+    // Load saved email from localStorage
+    init: function() {
+      const savedEmail = localStorage.getItem('walletEmail');
+      const savedBalance = localStorage.getItem('walletBalance');
+      
+      if (savedEmail && savedBalance) {
+        console.log('[Wallet Widget] Found saved session:', savedEmail);
+        this.currentEmail = savedEmail;
+        this.currentBalance = parseInt(savedBalance) || 0;
+        
+        // Pre-fill and show balance section
+        setTimeout(() => {
+          const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+          if (emailInput) {
+            emailInput.value = savedEmail;
+          }
+          
+          // Show balance immediately with saved data
+          this.displayBalance(this.currentBalance);
+          
+          // Then refresh from server in background
+          this.refreshBalance();
+        }, 500);
+      }
+    },
+    
+    displayBalance: function(balance) {
+      this.currentBalance = balance;
+      
+      const balanceEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance-display');
+      const balanceContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance');
+      const loginContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-login');
+      
+      if (balanceEl) balanceEl.textContent = balance;
+      if (balanceContainer) balanceContainer.style.display = 'block';
+      if (loginContainer) loginContainer.style.display = 'none';
+      
+      // Update cart display
+      this.updateCartDisplay();
+      
+      // Set up coin input listener
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      if (coinsInput) {
+        coinsInput.addEventListener('input', () => this.updateNewTotal());
+      }
+    },
+    
+    refreshBalance: async function() {
+      if (!this.currentEmail) return;
+      
+      try {
+        const response = await fetch(
+          API_BASE + '/wallet/balance?email=' + encodeURIComponent(this.currentEmail),
+          {
+            headers: {
+              'x-shop-url': shop,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          const newBalance = data.walletCoins || 0;
+          if (newBalance !== this.currentBalance) {
+            console.log('[Wallet Widget] Balance updated:', this.currentBalance, '->', newBalance);
+            this.displayBalance(newBalance);
+            localStorage.setItem('walletBalance', newBalance);
+          }
+        }
+      } catch (err) {
+        console.error('[Wallet Widget] Refresh error:', err);
+      }
+    },
+    
     getCartTotal: function() {
       // Method 1: Try Shopify cart API (most reliable)
       return fetch('/cart.js')
@@ -360,34 +435,11 @@
           this.currentEmail = email;
           this.currentBalance = data.walletCoins || 0;
           
-          // Try to find elements in both original and injected widget
-          let balanceEl = document.getElementById('wallet-embed-balance-display');
-          if (!balanceEl) {
-            balanceEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance-display');
-          }
+          // Save to localStorage for faster loading next time
+          localStorage.setItem('walletEmail', email);
+          localStorage.setItem('walletBalance', this.currentBalance);
           
-          let balanceContainer = document.getElementById('wallet-embed-balance');
-          if (!balanceContainer) {
-            balanceContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance');
-          }
-          
-          let loginContainer = document.getElementById('wallet-embed-login');
-          if (!loginContainer) {
-            loginContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-login');
-          }
-          
-          if (balanceEl) balanceEl.textContent = this.currentBalance;
-          if (balanceContainer) balanceContainer.style.display = 'block';
-          if (loginContainer) loginContainer.style.display = 'none';
-          
-          // Update cart display (async)
-          await this.updateCartDisplay();
-          
-          // Set up coin input listener
-          const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
-          if (coinsInput) {
-            coinsInput.addEventListener('input', () => this.updateNewTotal());
-          }
+          this.displayBalance(this.currentBalance);
           
           this.showMessage('Balance loaded!', 'success');
           console.log('[Wallet Widget] Balance loaded:', this.currentBalance, 'coins');
@@ -622,6 +674,9 @@
     subtree: true
   });
   
+  // Initialize (check for saved session)
+  walletAppEmbed.init();
+  
   // Use event delegation for button clicks (backup method)
   document.addEventListener('click', function(e) {
     const target = e.target;
@@ -653,26 +708,43 @@
       const customerEmail = {{ customer.email | json }};
       console.log('[Wallet Widget] Auto-checking balance for logged-in customer:', customerEmail);
       
-      // Wait for widget to be injected
-      setTimeout(function() {
+      // Try multiple times with increasing delays to ensure widget is injected
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      function tryAutoCheck() {
+        attempts++;
+        console.log('[Wallet Widget] Auto-check attempt', attempts);
+        
         const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+        
         if (emailInput && customerEmail) {
+          console.log('[Wallet Widget] Found email input, filling and checking balance');
           emailInput.value = customerEmail;
           // Trigger balance check automatically
           walletAppEmbed.checkBalance();
+        } else if (attempts < maxAttempts) {
+          console.log('[Wallet Widget] Widget not ready, retrying in 300ms...');
+          setTimeout(tryAutoCheck, 300);
+        } else {
+          console.log('[Wallet Widget] Failed to find widget after', maxAttempts, 'attempts');
         }
-      }, 500);
+      }
+      
+      // Start trying after initial delay
+      setTimeout(tryAutoCheck, 400);
     {% else %}
       console.log('[Wallet Widget] No customer logged in, manual email entry required');
     {% endif %}
   }
   
   // Run auto-check after injection attempts
-  setTimeout(autoCheckBalance, 600);
+  setTimeout(autoCheckBalance, 100);
   
   // Also run when cart opens
   document.addEventListener('cart:open', function() {
-    setTimeout(autoCheckBalance, 200);
+    console.log('[Wallet Widget] Cart opened, triggering auto-check');
+    setTimeout(autoCheckBalance, 100);
   });
   
   console.log('[Wallet Widget] Initialized and watching for cart');
