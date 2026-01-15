@@ -1,0 +1,9 @@
+api_version = "2024-01"
+
+[[extensions]]
+type = "checkout_ui_extension"
+name = "wallet-checkout-discount"
+handle = "wallet-checkout-discount"
+
+[[extensions.targeting]]
+target = "purchase.checkout.block.render"

@@ -534,19 +534,28 @@
       
       try {
         // Show loading message
-        this.showMessage('Creating discount...', 'success');
+        this.showMessage('Processing...', 'success');
         
-        // Create discount code
+        // Calculate discount amount
         const discountAmount = coinsToUse * this.coinValue;
-        console.log('[Wallet Widget] 🎫 Creating discount for', coinsToUse, 'coins (₹' + discountAmount + ')');
+        console.log('[Wallet Widget] 🎫 Applying', coinsToUse, 'coins (₹' + discountAmount + ')');
         
+        // Use tiered discount codes (merchant must create these in Shopify admin)
+        const tiers = [10, 25, 50, 100, 250, 500, 1000];
+        const tier = tiers.find(t => t >= discountAmount) || tiers[tiers.length - 1];
+        const discountCode = `WALLET${tier}`;
+        
+        console.log('[Wallet Widget] 🎟️  Using discount code:', discountCode, '(tier: ₹' + tier + ')');
+        
+        // Deduct coins from backend
         const requestBody = {
           email: this.currentEmail,
           coinsToRedeem: coinsToUse,
           discountAmount: discountAmount,
+          discountCode: discountCode,
         };
         
-        console.log('[Wallet Widget] 📤 Request:', API_BASE + '/shopify/create-discount', requestBody);
+        console.log('[Wallet Widget] 📤 Deducting coins from wallet...');
         
         const response = await fetch(API_BASE + '/shopify/create-discount', {
           method: 'POST',
@@ -557,44 +566,38 @@
           body: JSON.stringify(requestBody),
         });
         
-        console.log('[Wallet Widget] 📥 Response status:', response.status, response.statusText);
+        console.log('[Wallet Widget] 📥 Response status:', response.status);
         
         const data = await response.json();
-        
         console.log('[Wallet Widget] 📥 Response data:', data);
         
-        if (data.success && data.discountCode) {
-          console.log('[Wallet Widget] ✅ Discount code created:', data.discountCode);
+        if (data.success) {
+          console.log('[Wallet Widget] ✅ Coins deducted successfully');
           
-          // Update balance if coins were deducted
+          // Update balance
           if (data.newBalance !== undefined) {
             this.currentBalance = data.newBalance;
             localStorage.setItem('walletBalance', this.currentBalance);
             this.displayBalance(this.currentBalance);
           }
           
-          if (data.requiresManualSetup) {
-            this.showMessage(`Code ${data.discountCode} created! Redirecting...`, 'success');
-            console.log('[Wallet Widget] ⚠️ Manual setup required - merchant must create discount in Shopify');
-            setTimeout(() => {
-              console.log('[Wallet Widget] Redirecting to:', '/checkout?discount=' + data.discountCode);
-              window.location.href = '/checkout?discount=' + data.discountCode;
-            }, 2000);
-          } else {
-            this.showMessage('Discount applied! Redirecting...', 'success');
-            setTimeout(() => {
-              console.log('[Wallet Widget] Redirecting to:', '/checkout?discount=' + data.discountCode);
-              window.location.href = '/checkout?discount=' + data.discountCode;
-            }, 1000);
-          }
+          this.showMessage(`₹${discountAmount} discount applied! Redirecting...`, 'success');
+          
+          // Redirect to checkout with tiered discount code
+          setTimeout(() => {
+            console.log('[Wallet Widget] 🚀 Redirecting to checkout with code:', discountCode);
+            console.log('[Wallet Widget] 💡 Make sure discount code', discountCode, 'exists in Shopify admin');
+            window.location.href = '/checkout?discount=' + discountCode;
+          }, 1000);
+          
         } else {
-          const errorMsg = data.message || data.error || 'Failed to apply coins';
-          console.error('[Wallet Widget] ❌ Discount error:', data);
+          const errorMsg = data.error || data.message || 'Failed to apply coins';
+          console.error('[Wallet Widget] ❌ Error:', errorMsg);
           this.showMessage(errorMsg, 'error');
         }
       } catch (err) {
-        console.error('[Wallet Widget] ❌ Apply error:', err);
-        this.showMessage('Network error', 'error');
+        console.error('[Wallet Widget] ❌ Network error:', err);
+        this.showMessage('Network error. Please try again.', 'error');
       }
     }
   };
