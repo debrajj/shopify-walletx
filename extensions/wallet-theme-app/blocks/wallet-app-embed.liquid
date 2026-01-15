@@ -60,10 +60,6 @@
           class="wallet-embed-input"
           min="0"
         />
-        <div class="wallet-new-total">
-          <span class="wallet-label">New total</span>
-          <span class="wallet-value-large" id="wallet-embed-new-total">$0.00</span>
-        </div>
         <button class="wallet-embed-button wallet-button-primary" data-wallet-action="apply-coins">
           Apply & checkout
         </button>
@@ -338,10 +334,16 @@
       // Update cart display
       this.updateCartDisplay();
       
-      // Set up coin input listener
+      // Set up coin input listener - removed updateNewTotal
       const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
       if (coinsInput) {
-        coinsInput.addEventListener('input', () => this.updateNewTotal());
+        // Auto-limit input to max coins
+        coinsInput.addEventListener('input', () => {
+          const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
+          if (parseInt(coinsInput.value) > maxCoins) {
+            coinsInput.value = maxCoins;
+          }
+        });
       }
     },
     
@@ -404,29 +406,7 @@
       if (coinsInput) {
         const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
         coinsInput.setAttribute('max', maxCoins);
-        coinsInput.setAttribute('placeholder', 'Max: ' + maxCoins + ' coins');
-      }
-      
-      this.updateNewTotal();
-    },
-    
-    updateNewTotal: function() {
-      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
-      const newTotalEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-new-total');
-      
-      if (!coinsInput || !newTotalEl) return;
-      
-      const coinsToUse = parseInt(coinsInput.value) || 0;
-      const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
-      const actualCoins = Math.min(coinsToUse, maxCoins);
-      const discount = actualCoins * this.coinValue;
-      const newTotal = Math.max(0, this.cartTotal - discount);
-      
-      newTotalEl.textContent = '$' + newTotal.toFixed(2);
-      
-      // Update input if user entered more than allowed
-      if (coinsToUse > maxCoins) {
-        coinsInput.value = maxCoins;
+        coinsInput.setAttribute('placeholder', `Max: ${maxCoins} coins`);
       }
     },
     
