@@ -51,7 +51,7 @@
       
       <div class="wallet-apply-section">
         <label class="wallet-input-label" for="wallet-embed-coins-input">
-          Coins to redeem
+          Enter coins to redeem (1 coin = ₹1)
         </label>
         <input 
           type="number" 
@@ -60,9 +60,7 @@
           class="wallet-embed-input"
           min="0"
         />
-        <button class="wallet-embed-button wallet-button-primary" data-wallet-action="apply-coins">
-          Apply & checkout
-        </button>
+        <p class="wallet-hint">Press Enter to checkout with discount</p>
       </div>
     </div>
     
@@ -161,6 +159,13 @@
     color: #202223;
     font-weight: 500;
     margin-bottom: -8px;
+  }
+
+  .wallet-hint {
+    font-size: 12px;
+    color: #6d7175;
+    margin: 8px 0 0 0;
+    font-style: italic;
   }
 
   .wallet-new-total {
@@ -292,7 +297,7 @@
     currentEmail: '',
     currentBalance: 0,
     cartTotal: 0,
-    coinValue: 0.01, // 1 coin = $0.01
+    coinValue: 1, // 1 coin = ₹1 (changed from 0.01)
     
     // Load saved email from localStorage
     init: function() {
@@ -334,7 +339,7 @@
       // Update cart display
       this.updateCartDisplay();
       
-      // Set up coin input listener - removed updateNewTotal
+      // Set up coin input listener
       const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
       if (coinsInput) {
         // Auto-limit input to max coins
@@ -342,6 +347,14 @@
           const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
           if (parseInt(coinsInput.value) > maxCoins) {
             coinsInput.value = maxCoins;
+          }
+        });
+        
+        // Apply coins on Enter key
+        coinsInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.applyCoins();
           }
         });
       }
@@ -512,16 +525,12 @@
       }
       
       try {
-        // Show loading state
-        const applyButton = document.querySelector('#wallet-app-embed-injected [data-wallet-action="apply-coins"]');
-        if (applyButton) {
-          applyButton.disabled = true;
-          applyButton.textContent = 'Creating discount...';
-        }
+        // Show loading message
+        this.showMessage('Creating discount...', 'success');
         
         // Create discount code
         const discountAmount = coinsToUse * this.coinValue;
-        console.log('[Wallet Widget] Creating discount for', coinsToUse, 'coins ($' + discountAmount + ')');
+        console.log('[Wallet Widget] Creating discount for', coinsToUse, 'coins (₹' + discountAmount + ')');
         
         const response = await fetch(API_BASE + '/shopify/create-discount', {
           method: 'POST',
@@ -568,23 +577,9 @@
           const errorMsg = data.message || data.error || 'Failed to apply coins';
           console.error('[Wallet Widget] ❌ Discount error:', data);
           this.showMessage(errorMsg, 'error');
-          
-          // Reset button
-          if (applyButton) {
-            applyButton.disabled = false;
-            applyButton.textContent = 'Apply & checkout';
-          }
         }
       } catch (err) {
         console.error('[Wallet Widget] ❌ Apply error:', err);
-        this.showMessage('Network error', 'error');
-        
-        // Reset button
-        const applyButton = document.querySelector('#wallet-app-embed-injected [data-wallet-action="apply-coins"]');
-        if (applyButton) {
-          applyButton.disabled = false;
-          applyButton.textContent = 'Apply & checkout';
-        }
         this.showMessage('Network error', 'error');
       }
     }
@@ -656,7 +651,7 @@
     return false;
   }
   
-  // Attach click handler directly to the button in the cloned widget
+  // Attach handlers to the cloned widget
   function attachButtonHandler(clonedWidget) {
     const checkButton = clonedWidget.querySelector('[data-wallet-action="check-balance"]');
     if (checkButton) {
@@ -667,17 +662,6 @@
         walletAppEmbed.checkBalance();
       });
       console.log('[Wallet Widget] Check balance handler attached');
-    }
-    
-    const applyButton = clonedWidget.querySelector('[data-wallet-action="apply-coins"]');
-    if (applyButton) {
-      applyButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('[Wallet Widget] Apply coins clicked');
-        walletAppEmbed.applyCoins();
-      });
-      console.log('[Wallet Widget] Apply coins handler attached');
     }
     
     // Add email input listeners for instant check
