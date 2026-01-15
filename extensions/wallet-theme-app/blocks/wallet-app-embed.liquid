@@ -411,7 +411,7 @@
       
       const cartTotalEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-cart-total');
       if (cartTotalEl) {
-        cartTotalEl.textContent = '$' + this.cartTotal.toFixed(2);
+        cartTotalEl.textContent = '₹' + this.cartTotal.toFixed(2);
       }
       
       // Set max coins based on cart total
@@ -502,11 +502,19 @@
     applyCoins: async function() {
       const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
       if (!coinsInput) {
+        console.error('[Wallet Widget] ❌ Coins input not found');
         this.showMessage('Error: Input not found', 'error');
         return;
       }
       
       const coinsToUse = parseInt(coinsInput.value) || 0;
+      
+      console.log('[Wallet Widget] 📝 Apply coins request:', {
+        coinsToUse,
+        currentBalance: this.currentBalance,
+        cartTotal: this.cartTotal,
+        email: this.currentEmail
+      });
       
       if (coinsToUse <= 0) {
         this.showMessage('Please enter coins to use', 'error');
@@ -530,7 +538,15 @@
         
         // Create discount code
         const discountAmount = coinsToUse * this.coinValue;
-        console.log('[Wallet Widget] Creating discount for', coinsToUse, 'coins (₹' + discountAmount + ')');
+        console.log('[Wallet Widget] 🎫 Creating discount for', coinsToUse, 'coins (₹' + discountAmount + ')');
+        
+        const requestBody = {
+          email: this.currentEmail,
+          coinsToRedeem: coinsToUse,
+          discountAmount: discountAmount,
+        };
+        
+        console.log('[Wallet Widget] 📤 Request:', API_BASE + '/shopify/create-discount', requestBody);
         
         const response = await fetch(API_BASE + '/shopify/create-discount', {
           method: 'POST',
@@ -538,16 +554,14 @@
             'Content-Type': 'application/json',
             'x-shop-url': shop,
           },
-          body: JSON.stringify({
-            email: this.currentEmail,
-            coinsToRedeem: coinsToUse,
-            discountAmount: discountAmount,
-          }),
+          body: JSON.stringify(requestBody),
         });
+        
+        console.log('[Wallet Widget] 📥 Response status:', response.status, response.statusText);
         
         const data = await response.json();
         
-        console.log('[Wallet Widget] Discount response:', data);
+        console.log('[Wallet Widget] 📥 Response data:', data);
         
         if (data.success && data.discountCode) {
           console.log('[Wallet Widget] ✅ Discount code created:', data.discountCode);
