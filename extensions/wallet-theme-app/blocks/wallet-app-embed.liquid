@@ -532,8 +532,17 @@
       }
       
       try {
+        // Show loading state
+        const applyButton = document.querySelector('#wallet-app-embed-injected [data-wallet-action="apply-coins"]');
+        if (applyButton) {
+          applyButton.disabled = true;
+          applyButton.textContent = 'Creating discount...';
+        }
+        
         // Create discount code
         const discountAmount = coinsToUse * this.coinValue;
+        console.log('[Wallet Widget] Creating discount for', coinsToUse, 'coins ($' + discountAmount + ')');
+        
         const response = await fetch(API_BASE + '/shopify/create-discount', {
           method: 'POST',
           headers: {
@@ -552,6 +561,8 @@
         console.log('[Wallet Widget] Discount response:', data);
         
         if (data.success && data.discountCode) {
+          console.log('[Wallet Widget] ✅ Discount code created:', data.discountCode);
+          
           // Update balance if coins were deducted
           if (data.newBalance !== undefined) {
             this.currentBalance = data.newBalance;
@@ -560,24 +571,40 @@
           }
           
           if (data.requiresManualSetup) {
-            this.showMessage(`Code: ${data.discountCode} - Apply at checkout`, 'success');
-            // Still redirect but show message
+            this.showMessage(`Code ${data.discountCode} created! Redirecting...`, 'success');
+            console.log('[Wallet Widget] ⚠️ Manual setup required - merchant must create discount in Shopify');
             setTimeout(() => {
+              console.log('[Wallet Widget] Redirecting to:', '/checkout?discount=' + data.discountCode);
               window.location.href = '/checkout?discount=' + data.discountCode;
             }, 2000);
           } else {
-            this.showMessage('Redirecting to checkout...', 'success');
+            this.showMessage('Discount applied! Redirecting...', 'success');
             setTimeout(() => {
+              console.log('[Wallet Widget] Redirecting to:', '/checkout?discount=' + data.discountCode);
               window.location.href = '/checkout?discount=' + data.discountCode;
             }, 1000);
           }
         } else {
           const errorMsg = data.message || data.error || 'Failed to apply coins';
-          console.error('[Wallet Widget] Discount error:', data);
+          console.error('[Wallet Widget] ❌ Discount error:', data);
           this.showMessage(errorMsg, 'error');
+          
+          // Reset button
+          if (applyButton) {
+            applyButton.disabled = false;
+            applyButton.textContent = 'Apply & checkout';
+          }
         }
       } catch (err) {
-        console.error('[Wallet Widget] Apply error:', err);
+        console.error('[Wallet Widget] ❌ Apply error:', err);
+        this.showMessage('Network error', 'error');
+        
+        // Reset button
+        const applyButton = document.querySelector('#wallet-app-embed-injected [data-wallet-action="apply-coins"]');
+        if (applyButton) {
+          applyButton.disabled = false;
+          applyButton.textContent = 'Apply & checkout';
+        }
         this.showMessage('Network error', 'error');
       }
     }
