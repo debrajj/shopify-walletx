@@ -61,4 +61,42 @@ async function testDiscountCreation() {
   }
 }
 
-testDiscountCreation();
+async function testBalance() {
+  console.log('🧪 Testing balance check...\n');
+  
+  const email = 'debrajecomcure@gmail.com';
+  const shopUrl = 'cmstestingg.myshopify.com';
+  
+  console.log('📝 Request:');
+  console.log('  Email:', email);
+  console.log('  Shop:', shopUrl);
+  console.log('');
+  
+  try {
+    const response = await fetch(API_BASE + '/wallet/balance?email=' + encodeURIComponent(email), {
+      headers: {
+        'x-shop-url': shopUrl,
+      },
+    });
+    
+    console.log('📥 Response status:', response.status, response.statusText);
+    
+    const data = await response.json();
+    
+    console.log('\n📦 Response data:');
+    console.log(JSON.stringify(data, null, 2));
+    
+    if (data.success || data.walletCoins !== undefined) {
+      console.log('\n✅ SUCCESS!');
+      console.log('  Balance:', data.walletCoins, 'coins');
+    } else {
+      console.log('\n❌ FAILED!');
+      console.log('  Error:', data.error || data.message);
+    }
+    
+  } catch (error) {
+    console.error('\n❌ Network error:', error.message);
+  }
+}
+
+testBalance();
