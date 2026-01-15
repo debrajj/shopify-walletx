@@ -4,13 +4,8 @@ const db = require('../config/db');
  * Create a Shopify discount code that works immediately at checkout
  * Uses GraphQL Admin API for better reliability
  */
-async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmount) {
+async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmount, discountCode) {
   try {
-    // Generate unique discount code with random component
-    const emailHash = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
-    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const discountCode = `WALLET${emailHash}${randomNum}`.toUpperCase();
-    
     console.log(`[Discount] 🎫 Creating discount: ${discountCode} for ₹${discountAmount}`);
     
     // Get shop's access token

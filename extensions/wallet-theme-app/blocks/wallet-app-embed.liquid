@@ -534,20 +534,20 @@
       
       try {
         // Show loading message
-        this.showMessage('Processing...', 'success');
+        this.showMessage('Creating discount...', 'success');
         
         // Calculate discount amount
         const discountAmount = coinsToUse * this.coinValue;
-        console.log('[Wallet Widget] 🎫 Applying', coinsToUse, 'coins (₹' + discountAmount + ')');
+        console.log('[Wallet Widget] 🎫 Creating discount for', coinsToUse, 'coins (₹' + discountAmount + ')');
         
-        // Use tiered discount codes (merchant must create these in Shopify admin)
-        const tiers = [10, 25, 50, 100, 250, 500, 1000];
-        const tier = tiers.find(t => t >= discountAmount) || tiers[tiers.length - 1];
-        const discountCode = `WALLET${tier}`;
+        // Generate unique random discount code
+        const timestamp = Date.now().toString().slice(-6);
+        const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const discountCode = `WALLET${timestamp}${randomNum}`.toUpperCase();
         
-        console.log('[Wallet Widget] 🎟️  Using discount code:', discountCode, '(tier: ₹' + tier + ')');
+        console.log('[Wallet Widget] 🎟️  Generated code:', discountCode, 'for ₹' + discountAmount);
         
-        // Deduct coins from backend
+        // Send request to backend to create discount and deduct coins
         const requestBody = {
           email: this.currentEmail,
           coinsToRedeem: coinsToUse,
@@ -555,7 +555,7 @@
           discountCode: discountCode,
         };
         
-        console.log('[Wallet Widget] 📤 Deducting coins from wallet...');
+        console.log('[Wallet Widget] 📤 Creating discount in Shopify...');
         
         const response = await fetch(API_BASE + '/shopify/create-discount', {
           method: 'POST',
@@ -572,7 +572,7 @@
         console.log('[Wallet Widget] 📥 Response data:', data);
         
         if (data.success) {
-          console.log('[Wallet Widget] ✅ Coins deducted successfully');
+          console.log('[Wallet Widget] ✅ Discount created:', data.discountCode || discountCode);
           
           // Update balance
           if (data.newBalance !== undefined) {
@@ -581,14 +581,22 @@
             this.displayBalance(this.currentBalance);
           }
           
-          this.showMessage(`₹${discountAmount} discount applied! Redirecting...`, 'success');
+          const finalCode = data.discountCode || discountCode;
           
-          // Redirect to checkout with tiered discount code
-          setTimeout(() => {
-            console.log('[Wallet Widget] 🚀 Redirecting to checkout with code:', discountCode);
-            console.log('[Wallet Widget] 💡 Make sure discount code', discountCode, 'exists in Shopify admin');
-            window.location.href = '/checkout?discount=' + discountCode;
-          }, 1000);
+          if (data.requiresManualSetup) {
+            this.showMessage(`Code ${finalCode} created! Please create this discount in Shopify admin for ₹${discountAmount}. Redirecting...`, 'success');
+            console.log('[Wallet Widget] ⚠️  Manual setup required - create discount in Shopify admin');
+            console.log('[Wallet Widget] 💡 Code:', finalCode, '| Amount: ₹' + discountAmount);
+            setTimeout(() => {
+              window.location.href = '/checkout?discount=' + finalCode;
+            }, 3000);
+          } else {
+            this.showMessage(`₹${discountAmount} discount applied! Redirecting...`, 'success');
+            setTimeout(() => {
+              console.log('[Wallet Widget] 🚀 Redirecting to checkout with code:', finalCode);
+              window.location.href = '/checkout?discount=' + finalCode;
+            }, 1000);
+          }
           
         } else {
           const errorMsg = data.error || data.message || 'Failed to apply coins';

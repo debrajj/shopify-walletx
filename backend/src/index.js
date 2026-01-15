@@ -525,10 +525,12 @@ app.post('/api/wallet/deduct', requireStorefrontAuth, async (req, res) => {
 // 5b. Create Discount Code (Storefront/Public)
 app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res) => {
   try {
-    const { email, coinsToRedeem, discountAmount } = req.body;
+    const { email, coinsToRedeem, discountAmount, discountCode } = req.body;
     const shopUrl = req.shopUrl;
     
-    if (!email || !coinsToRedeem) {
+    console.log('[API] Create discount request:', { email, coinsToRedeem, discountAmount, discountCode, shopUrl });
+    
+    if (!email || !coinsToRedeem || !discountCode) {
       return res.status(400).json({ 
         success: false,
         error: 'Missing required fields' 
@@ -559,31 +561,31 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
       });
     }
     
-    // Create Shopify discount code
-    const discountResult = await createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmount);
+    // Try to create Shopify discount code
+    console.log('[API] Attempting to create Shopify discount...');
+    const discountResult = await createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmount, discountCode);
     
-    if (discountResult.success) {
-      // Deduct coins immediately
-      const newBalance = currentBalance - coinsToRedeem;
-      await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2', [newBalance, wallet.id]);
-      
-      // Log transaction
-      await db.query(`
-        INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status)
-        VALUES ($1, $2, $3, $4, 'DEBIT', 'PENDING')
-      `, [wallet.id, shopUrl, discountResult.discountCode, coinsToRedeem]);
-      
-      return res.json({
-        ...discountResult,
-        newBalance
-      });
-    }
+    console.log('[API] Discount result:', discountResult);
     
-    // Return result (may require manual setup)
-    res.json(discountResult);
+    // Deduct coins immediately (even if discount creation fails, we'll handle it)
+    const newBalance = currentBalance - coinsToRedeem;
+    await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2', [newBalance, wallet.id]);
+    
+    // Log transaction
+    await db.query(`
+      INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status)
+      VALUES ($1, $2, $3, $4, 'DEBIT', 'PENDING')
+    `, [wallet.id, shopUrl, discountResult.discountCode || discountCode, coinsToRedeem]);
+    
+    console.log('[API] ✅ Coins deducted. New balance:', newBalance);
+    
+    return res.json({
+      ...discountResult,
+      newBalance
+    });
     
   } catch (error) {
-    console.error('[Wallet] Create discount error:', error);
+    console.error('[API] Create discount error:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to create discount code' 
