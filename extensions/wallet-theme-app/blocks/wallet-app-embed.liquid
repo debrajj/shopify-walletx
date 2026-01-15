@@ -53,14 +53,21 @@
         <label class="wallet-input-label" for="wallet-embed-coins-input">
           Enter coins to redeem (1 coin = ₹1)
         </label>
-        <input 
-          type="number" 
-          id="wallet-embed-coins-input" 
-          placeholder="0"
-          class="wallet-embed-input"
-          min="0"
-        />
-        <p class="wallet-hint">Press Enter to checkout with discount</p>
+        <div class="wallet-coins-input-wrapper">
+          <input 
+            type="number" 
+            id="wallet-embed-coins-input" 
+            placeholder="0"
+            class="wallet-embed-input wallet-coins-input"
+            min="0"
+          />
+          <button class="wallet-apply-arrow-button" data-wallet-action="apply-coins" title="Apply coins">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M4 10H16M16 10L11 5M16 10L11 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <p class="wallet-hint">Click arrow or press Enter to checkout with discount</p>
       </div>
     </div>
     
@@ -166,6 +173,52 @@
     color: #6d7175;
     margin: 8px 0 0 0;
     font-style: italic;
+  }
+
+  .wallet-coins-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .wallet-coins-input {
+    flex: 1;
+  }
+
+  .wallet-apply-arrow-button {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: #202223;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .wallet-apply-arrow-button:hover {
+    background: #2c2e2f;
+    transform: translateX(2px);
+  }
+
+  .wallet-apply-arrow-button:active {
+    background: #44474a;
+    transform: translateX(4px);
+  }
+
+  .wallet-apply-arrow-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .wallet-apply-arrow-button svg {
+    flex-shrink: 0;
   }
 
   .wallet-new-total {
@@ -687,6 +740,18 @@
         walletAppEmbed.checkBalance();
       });
       console.log('[Wallet Widget] Check balance handler attached');
+    }
+    
+    // Attach arrow button handler
+    const applyButton = clonedWidget.querySelector('[data-wallet-action="apply-coins"]');
+    if (applyButton) {
+      applyButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Wallet Widget] 🎯 Arrow button clicked');
+        walletAppEmbed.applyCoins();
+      });
+      console.log('[Wallet Widget] Apply arrow button handler attached');
     }
     
     // Add email input listeners for instant check
