@@ -8,13 +8,17 @@ async function testDiscountCreation() {
   console.log('🧪 Testing discount creation...\n');
   
   // Test data
-  const coinsToUse = 10;
-  const discountAmount = 10; // 10 coins = ₹10
+  const coinsToUse = 200;
+  const discountAmount = 200; // 200 coins = ₹200
+  const timestamp = Date.now().toString().slice(-6);
+  const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const discountCode = `WALLET${timestamp}${randomNum}`.toUpperCase();
   
   console.log('📝 Request details:');
   console.log('  Email:', TEST_EMAIL);
   console.log('  Coins:', coinsToUse);
   console.log('  Discount Amount: ₹' + discountAmount);
+  console.log('  Discount Code:', discountCode);
   console.log('  Shop:', SHOP_URL);
   console.log('');
   
@@ -29,6 +33,7 @@ async function testDiscountCreation() {
         email: TEST_EMAIL,
         coinsToRedeem: coinsToUse,
         discountAmount: discountAmount,
+        discountCode: discountCode,
       }),
     });
     
