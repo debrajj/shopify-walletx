@@ -288,6 +288,13 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
       }
     };
     
+    // Log the exact payload being sent to Shopify
+    console.log('[Discount] 📤 GraphQL Mutation Variables:', JSON.stringify({
+      discountAmount: discountAmount,
+      formattedAmount: formatDiscountAmount(discountAmount),
+      fullVariables: variables
+    }, null, 2));
+    
     const response = await fetch(`https://${shopUrl}/admin/api/2024-01/graphql.json`, {
       method: 'POST',
       headers: {
