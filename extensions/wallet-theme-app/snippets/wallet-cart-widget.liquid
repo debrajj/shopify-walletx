@@ -1,26 +1,29 @@
 <div id="wallet-cart-widget" class="wallet-cart-widget" data-shop="{{ shop.permanent_domain }}">
   <div class="wallet-cart-container">
-    <div class="wallet-cart-header">
-      <span class="wallet-cart-icon">💰</span>
-      <span class="wallet-cart-title">Wallet Coins</span>
-    </div>
-    
-    <div id="wallet-cart-balance" class="wallet-cart-balance">
-      <span class="wallet-cart-balance-amount" id="wallet-balance-display">0</span>
-      <span class="wallet-cart-balance-label">coins available</span>
-    </div>
-    
-    <div id="wallet-cart-apply" class="wallet-cart-apply" style="display: none;">
-      <input 
-        type="number" 
-        id="wallet-coins-input" 
-        placeholder="Coins to use"
-        class="wallet-cart-input"
-        min="1"
-      />
-      <button class="wallet-cart-button" onclick="walletCartWidget.applyCoins()">
-        Apply at Checkout
+    <div id="wallet-cart-display" class="wallet-cart-display" style="display: none;">
+      <div class="wallet-balance-section">
+        <div class="wallet-balance-label">Your balance</div>
+        <div class="wallet-balance-amount" id="wallet-balance-display">815 points</div>
+      </div>
+      <button class="wallet-redeem-button" onclick="walletCartWidget.showRedeemForm()">
+        Redeem points
       </button>
+    </div>
+    
+    <div id="wallet-cart-redeem" class="wallet-cart-redeem" style="display: none;">
+      <div class="wallet-input-wrapper">
+        <input 
+          type="number" 
+          id="wallet-coins-input" 
+          placeholder="Enter coins to redeem (1 coin = ₹1)"
+          class="wallet-cart-input"
+          min="1"
+        />
+        <button class="wallet-cart-arrow" onclick="walletCartWidget.applyCoins()" title="Click arrow or press Enter to checkout with discount">
+          →
+        </button>
+      </div>
+      <div class="wallet-input-hint">Click arrow or press Enter to checkout with discount</div>
     </div>
     
     <div id="wallet-cart-login" class="wallet-cart-login">
@@ -43,115 +46,135 @@
   .wallet-cart-widget {
     padding: 16px;
     margin: 12px 0;
-    border-radius: 8px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   .wallet-cart-container {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #f5f5f5;
     border-radius: 12px;
-    padding: 16px;
-    color: white;
+    padding: 20px;
   }
 
-  .wallet-cart-header {
+  .wallet-cart-display {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 16px;
   }
 
-  .wallet-cart-icon {
-    font-size: 20px;
+  .wallet-balance-section {
+    flex: 1;
   }
 
-  .wallet-cart-title {
-    font-size: 16px;
-    font-weight: 600;
-  }
-
-  .wallet-cart-balance {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-    margin-bottom: 12px;
-    backdrop-filter: blur(10px);
-  }
-
-  .wallet-cart-balance-amount {
-    display: block;
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1;
+  .wallet-balance-label {
+    font-size: 14px;
+    color: #999;
     margin-bottom: 4px;
   }
 
-  .wallet-cart-balance-label {
-    font-size: 12px;
-    opacity: 0.9;
+  .wallet-balance-amount {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+  }
+
+  .wallet-redeem-button {
+    padding: 12px 24px;
+    background: white;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .wallet-redeem-button:hover {
+    background: #fafafa;
+    border-color: #ccc;
+  }
+
+  .wallet-cart-redeem {
+    margin-top: 12px;
+  }
+
+  .wallet-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
   }
 
   .wallet-cart-input {
-    width: 100%;
+    flex: 1;
     padding: 10px 12px;
-    border: 2px solid rgba(255,255,255,0.3);
+    border: 1px solid #d0d0d0;
     border-radius: 6px;
     font-size: 14px;
-    background: rgba(255,255,255,0.1);
-    color: white;
-    margin-bottom: 8px;
+    background: white;
+    color: #333;
     box-sizing: border-box;
   }
 
   .wallet-cart-input::placeholder {
-    color: rgba(255,255,255,0.6);
+    color: #999;
   }
 
   .wallet-cart-input:focus {
     outline: none;
-    border-color: rgba(255,255,255,0.6);
-    background: rgba(255,255,255,0.15);
+    border-color: #667eea;
   }
 
-  .wallet-cart-button {
-    width: 100%;
-    padding: 12px;
-    background: white;
-    color: #667eea;
+  .wallet-cart-arrow {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: #667eea;
+    color: white;
     border: none;
     border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: bold;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .wallet-cart-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  .wallet-cart-arrow:hover {
+    background: #5568d3;
+    transform: translateX(2px);
   }
 
-  .wallet-cart-button:disabled {
+  .wallet-cart-arrow:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .wallet-input-hint {
+    font-size: 12px;
+    color: #666;
+    text-align: center;
   }
 
   .wallet-cart-button-small {
     width: 100%;
     padding: 10px;
-    background: rgba(255,255,255,0.2);
+    background: #667eea;
     color: white;
-    border: 1px solid rgba(255,255,255,0.3);
+    border: none;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .wallet-cart-button-small:hover {
-    background: rgba(255,255,255,0.3);
+    background: #5568d3;
   }
 
   .wallet-cart-message {
@@ -163,13 +186,15 @@
   }
 
   .wallet-cart-message.success {
-    background: rgba(76, 175, 80, 0.3);
-    border: 1px solid rgba(76, 175, 80, 0.5);
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
   }
 
   .wallet-cart-message.error {
-    background: rgba(244, 67, 54, 0.3);
-    border: 1px solid rgba(244, 67, 54, 0.5);
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ef9a9a;
   }
 </style>
 
@@ -196,7 +221,13 @@
         msgEl.className = 'wallet-cart-message';
       }, 4000);
     },
-    
+
+    showRedeemForm: function() {
+      document.getElementById('wallet-cart-display').style.display = 'none';
+      document.getElementById('wallet-cart-redeem').style.display = 'block';
+      document.getElementById('wallet-coins-input').focus();
+    },
+
     checkBalance: async function() {
       const phone = document.getElementById('wallet-phone').value.trim();
       if (!phone) {
@@ -220,10 +251,10 @@
           this.currentPhone = phone;
           this.currentBalance = data.walletCoins || 0;
           
-          document.getElementById('wallet-balance-display').textContent = this.currentBalance;
+          document.getElementById('wallet-balance-display').textContent = this.currentBalance + ' points';
           
           if (this.currentBalance > 0) {
-            document.getElementById('wallet-cart-apply').style.display = 'block';
+            document.getElementById('wallet-cart-display').style.display = 'flex';
             document.getElementById('wallet-cart-login').style.display = 'none';
             document.getElementById('wallet-coins-input').max = this.currentBalance;
             this.showMessage('Balance loaded!', 'success');
@@ -261,5 +292,17 @@
       }, 800);
     }
   };
+
+  // Add Enter key support for input
+  document.addEventListener('DOMContentLoaded', function() {
+    const coinsInput = document.getElementById('wallet-coins-input');
+    if (coinsInput) {
+      coinsInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          walletCartWidget.applyCoins();
+        }
+      });
+    }
+  });
 })();
 </script>
