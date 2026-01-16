@@ -846,10 +846,10 @@
         const discountAmount = coinsToUse * this.coinValue;
         console.log('[Wallet Widget] 🎫 Creating discount for', coinsToUse, 'coins (₹' + discountAmount + ')');
         
-        // Generate unique random discount code
+        // Generate unique random discount code with COIN prefix
         const timestamp = Date.now().toString().slice(-6);
         const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        const discountCode = `WALLET${timestamp}${randomNum}`.toUpperCase();
+        const discountCode = `COIN${timestamp}${randomNum}`.toUpperCase();
         
         console.log('[Wallet Widget] 🎟️  Generated code:', discountCode, 'for ₹' + discountAmount);
         
@@ -897,25 +897,25 @@
               window.location.href = '/checkout';
             }, 1500);
           } else if (data.isExisting) {
-            // Customer already has an active code
-            this.showMessage(`You already have an active code: ${finalCode}. Redirecting...`, 'success');
+            // Customer already has an active automatic discount
+            this.showMessage(`Your ₹${discountAmount} discount will apply automatically! Redirecting...`, 'success');
             setTimeout(() => {
-              console.log('[Wallet Widget] 🚀 Redirecting to checkout with existing code:', finalCode);
-              window.location.href = '/checkout?discount=' + finalCode;
-            }, 2000);
+              console.log('[Wallet Widget] 🚀 Redirecting to checkout with existing automatic discount');
+              window.location.href = '/checkout';
+            }, 1500);
           } else if (data.requiresManualSetup) {
             this.showMessage(`Code ${finalCode} created! Please create this discount in Shopify admin for ₹${discountAmount}. Redirecting...`, 'success');
             console.log('[Wallet Widget] ⚠️  Manual setup required - create discount in Shopify admin');
-            console.log('[Wallet Widget] � CoRde:', finalCode, '| Amount: ₹' + discountAmount);
+            console.log('[Wallet Widget] Code:', finalCode, '| Amount: ₹' + discountAmount);
             setTimeout(() => {
               window.location.href = '/checkout?discount=' + finalCode;
             }, 3000);
           } else {
-            // Discount code created
+            // Discount created successfully
             this.showMessage(`₹${discountAmount} discount applied! Redirecting...`, 'success');
             setTimeout(() => {
-              console.log('[Wallet Widget] 🚀 Redirecting to checkout with code:', finalCode);
-              window.location.href = '/checkout?discount=' + finalCode;
+              console.log('[Wallet Widget] 🚀 Redirecting to checkout');
+              window.location.href = '/checkout';
             }, 1000);
           }
           
@@ -1170,13 +1170,27 @@
         e.preventDefault();
         e.stopPropagation();
         
+        console.log('[Wallet Widget] Event delegation caught action:', action);
+        
         if (action === 'check-balance') {
           console.log('[Wallet Widget] Check balance (delegation)');
           walletAppEmbed.checkBalance();
           return;
+        } else if (action === 'show-redeem') {
+          console.log('[Wallet Widget] Show redeem form (delegation)');
+          walletAppEmbed.showRedeemForm();
+          return;
         } else if (action === 'apply-coins') {
           console.log('[Wallet Widget] Apply coins (delegation)');
           walletAppEmbed.applyCoins();
+          return;
+        } else if (action === 'increase-coins') {
+          console.log('[Wallet Widget] Increase coins (delegation)');
+          walletAppEmbed.increaseCoins();
+          return;
+        } else if (action === 'decrease-coins') {
+          console.log('[Wallet Widget] Decrease coins (delegation)');
+          walletAppEmbed.decreaseCoins();
           return;
         }
       }

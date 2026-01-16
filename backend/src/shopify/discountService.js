@@ -108,9 +108,9 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     
     const variables = {
       automaticBasicDiscount: {
-        title: `Coin Wallet - ${email} - ${discountCode}`,
+        title: `Coin Wallet Discount - ${discountCode}`,
         startsAt: new Date().toISOString(),
-        endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+        endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
         customerSelection: {
           customers: {
             add: [customerId]
@@ -127,9 +127,14 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
             all: true
           }
         },
+        minimumRequirement: {
+          greaterThanOrEqualToSubtotal: {
+            greaterThanOrEqualToSubtotal: "0"
+          }
+        },
         combinesWith: {
           orderDiscounts: true,
-          productDiscounts: false,
+          productDiscounts: true,
           shippingDiscounts: false
         }
       }
