@@ -222,7 +222,7 @@ function verifyDiscountAmount(expectedAmount, actualAmount, tolerance = 0.01) {
 
 /**
  * Create a Shopify AUTOMATIC discount that applies at checkout
- * Uses GraphQL Admin API to create customer-specific automatic discounts
+ * Uses GraphQL Admin API to create automatic discounts (no code needed)
  * 
  * Benefits:
  * - No discount code needed
@@ -248,7 +248,7 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     
     console.log(`[Discount] 🎫 Creating AUTOMATIC discount for ${email}: ₹${discountAmount}`);
     
-    // Get shop's access token and get customer ID
+    // Get shop's access token
     const shopResult = await db.query('SELECT shopify_access_token FROM users WHERE store_url = $1', [shopUrl]);
     
     if (shopResult.rows.length === 0 || !shopResult.rows[0].shopify_access_token) {
@@ -266,25 +266,62 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     
     const accessToken = shopResult.rows[0].shopify_access_token;
     
-    // Create automatic discount code (applies automatically, single use)
-    console.log(`[Discount] 🔑 Creating automatic discount code...`);
+    // Get customer ID from Shopify
+    console.log(`[Discount] 🔍 Looking up customer ID for ${email}...`);
+    const customerQuery = `
+      query getCustomer($email: String!) {
+        customers(first: 1, query: $email) {
+          edges {
+            node {
+              id
+              email
+            }
+          }
+        }
+      }
+    `;
     
-    // Create discount CODE that applies automatically
-    // This is more reliable than customer-specific automatic discounts
+    const customerResponse = await fetch(`https://${shopUrl}/admin/api/2024-01/graphql.json`, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: customerQuery,
+        variables: { email: `email:${email}` }
+      })
+    });
+    
+    const customerResult = await customerResponse.json();
+    console.log('[Discount] 📥 Customer lookup response:', JSON.stringify(customerResult, null, 2));
+    
+    const customerId = customerResult.data?.customers?.edges?.[0]?.node?.id;
+    
+    if (!customerId) {
+      console.warn(`[Discount] ⚠️  Customer ${email} not found in Shopify`);
+      return {
+        success: false,
+        error: 'Customer not found in Shopify. Customer must exist before creating automatic discount.',
+        discountCode,
+        discountValue: discountAmount
+      };
+    }
+    
+    console.log(`[Discount] ✅ Found customer ID: ${customerId}`);
+    
+    // Create AUTOMATIC discount (no code needed)
+    console.log(`[Discount] 🔑 Creating automatic discount (no code)...`);
+    
     const graphqlQuery = `
-      mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
-        discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
-          codeDiscountNode {
+      mutation discountAutomaticBasicCreate($automaticBasicDiscount: DiscountAutomaticBasicInput!) {
+        discountAutomaticBasicCreate(automaticBasicDiscount: $automaticBasicDiscount) {
+          automaticDiscountNode {
             id
-            codeDiscount {
-              ... on DiscountCodeBasic {
+            automaticDiscount {
+              ... on DiscountAutomaticBasic {
                 title
                 status
-                codes(first: 1) {
-                  nodes {
-                    code
-                  }
-                }
                 customerGets {
                   value {
                     ... on DiscountAmount {
@@ -308,14 +345,10 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     `;
     
     const variables = {
-      basicCodeDiscount: {
-        title: `Coin Wallet - ${discountCode}`,
-        code: discountCode,
+      automaticBasicDiscount: {
+        title: `Coin Wallet - ${email} - ${discountCode}`,
         startsAt: new Date().toISOString(),
         endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-        customerSelection: {
-          all: true  // Available to all customers
-        },
         customerGets: {
           value: {
             discountAmount: {
@@ -327,12 +360,10 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
             all: true
           }
         },
-        appliesOncePerCustomer: true,  // Single use per customer
-        usageLimit: 1,  // Can only be used once total
-        combinesWith: {
-          orderDiscounts: true,
-          productDiscounts: false,
-          shippingDiscounts: false
+        minimumRequirement: {
+          greaterThanOrEqualToSubtotal: {
+            greaterThanOrEqualToSubtotal: "0.01"
+          }
         }
       }
     };
@@ -341,6 +372,7 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     console.log('[Discount] 📤 GraphQL Mutation Variables:', JSON.stringify({
       discountAmount: discountAmount,
       formattedAmount: formatDiscountAmount(discountAmount),
+      customerId: customerId,
       fullVariables: variables
     }, null, 2));
     
@@ -361,19 +393,19 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     // Log complete response
     console.log('[Discount] 📥 GraphQL Response:', JSON.stringify({
       timestamp: new Date().toISOString(),
-      success: !!result.data?.discountCodeBasicCreate?.codeDiscountNode,
-      hasErrors: !!result.data?.discountCodeBasicCreate?.userErrors?.length,
+      success: !!result.data?.discountAutomaticBasicCreate?.automaticDiscountNode,
+      hasErrors: !!result.data?.discountAutomaticBasicCreate?.userErrors?.length,
       response: result
     }, null, 2));
     
-    if (result.data?.discountCodeBasicCreate?.codeDiscountNode) {
-      console.log(`[Discount] ✅ Discount CODE created successfully!`);
+    if (result.data?.discountAutomaticBasicCreate?.automaticDiscountNode) {
+      console.log(`[Discount] ✅ AUTOMATIC discount created successfully!`);
       
-      const discountId = result.data.discountCodeBasicCreate.codeDiscountNode.id;
-      const createdCode = result.data.discountCodeBasicCreate.codeDiscountNode.codeDiscount.codes.nodes[0]?.code || discountCode;
+      const discountId = result.data.discountAutomaticBasicCreate.automaticDiscountNode.id;
+      const discountTitle = result.data.discountAutomaticBasicCreate.automaticDiscountNode.automaticDiscount.title;
       
       // Verify the created discount amount
-      const verificationResult = await getDiscountCodeDetails(shopUrl, accessToken, discountId);
+      const verificationResult = await getDiscountDetails(shopUrl, accessToken, discountId);
       
       let verified = false;
       let actualDiscountValue = discountAmount;
@@ -385,7 +417,7 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
         amountMismatch = !verified;
         
         if (amountMismatch) {
-          logDiscrepancy(discountAmount, actualDiscountValue, createdCode);
+          logDiscrepancy(discountAmount, actualDiscountValue, discountTitle);
         } else {
           console.log(`[Discount] ✅ Amount verified: ₹${actualDiscountValue} matches expected ₹${discountAmount}`);
         }
@@ -395,19 +427,19 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
       
       return {
         success: true,
-        discountCode: createdCode,
+        discountCode: discountCode, // Keep for reference
         discountValue: discountAmount,
         actualDiscountValue,
         discountId,
-        isAutomatic: false,  // It's a code, but will be auto-applied by widget
+        isAutomatic: true,  // TRUE automatic discount
         verified,
         amountMismatch,
-        message: `Discount code ${createdCode} created! Apply at checkout.`
+        message: `Automatic discount created! Will apply at checkout.`
       };
     }
     
-    if (result.data?.discountCodeBasicCreate?.userErrors?.length > 0) {
-      const errors = result.data.discountCodeBasicCreate.userErrors;
+    if (result.data?.discountAutomaticBasicCreate?.userErrors?.length > 0) {
+      const errors = result.data.discountAutomaticBasicCreate.userErrors;
       console.error('[Discount] ❌ GraphQL errors:', errors);
       
       return {
