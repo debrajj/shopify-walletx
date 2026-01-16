@@ -720,12 +720,17 @@
           localStorage.setItem('walletEmail', email);
           localStorage.setItem('walletBalance', this.currentBalance);
           
-          this.displayBalance(this.currentBalance);
-          
-          this.showMessage('Balance loaded!', 'success');
-          console.log('[Wallet Widget] Balance loaded:', this.currentBalance, 'coins');
+          if (this.currentBalance > 0) {
+            this.displayBalance(this.currentBalance);
+            this.showMessage('Balance loaded!', 'success');
+            console.log('[Wallet Widget] Balance loaded:', this.currentBalance, 'coins');
+          } else {
+            // No coins available
+            this.showMessage('No coins available for this email', 'error');
+            console.log('[Wallet Widget] No coins found for:', email);
+          }
         } else {
-          this.showMessage('Email not found', 'error');
+          this.showMessage('Email not found. Please check your email or phone number.', 'error');
         }
       } catch (err) {
         console.error('[Wallet Widget] Error:', err);
@@ -884,6 +889,7 @@
       
       console.log('[Wallet Widget] Injected after .cart-discount');
       attachButtonHandler(clone);
+      walletAppEmbed.init(); // Auto-detect logged-in customer
       return true;
     }
     
@@ -917,6 +923,7 @@
         
         console.log('[Wallet Widget] Injected into:', selector);
         attachButtonHandler(clone);
+        walletAppEmbed.init(); // Auto-detect logged-in customer
         return true;
       }
     }
