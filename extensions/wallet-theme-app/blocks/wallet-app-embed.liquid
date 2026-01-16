@@ -14,6 +14,7 @@
 {% endschema %}
 
 {% if block.settings.enabled %}
+<!-- Wallet Widget v4.3 - Updated with increment/decrement buttons -->
 <div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}">
   <div class="wallet-embed-container">
     <div class="wallet-embed-header">
@@ -402,7 +403,7 @@
 
 <script>
 (function() {
-  const WIDGET_VERSION = '2.3.0'; // Version with instant AJAX cart total update
+  const WIDGET_VERSION = '4.3.0'; // Version with increment/decrement buttons and auto-login
   console.log('[Wallet Widget] Version:', WIDGET_VERSION);
   
   if (window.walletAppEmbed) return; // Already initialized
