@@ -108,7 +108,7 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     
     const variables = {
       automaticBasicDiscount: {
-        title: `Wallet Coins - ${email} - ${discountCode}`,
+        title: `Coin Wallet - ${email} - ${discountCode}`,
         startsAt: new Date().toISOString(),
         endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
         customerSelection: {
@@ -220,7 +220,7 @@ async function createDiscountCodeFallback(shopUrl, accessToken, email, coinsToRe
   
   const variables = {
     basicCodeDiscount: {
-      title: `Wallet Coins - ${discountCode}`,
+      title: `Coin Wallet - ${discountCode}`,
       code: discountCode,
       startsAt: new Date().toISOString(),
       endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
