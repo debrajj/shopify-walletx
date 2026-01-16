@@ -296,19 +296,61 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
     const customerResult = await customerResponse.json();
     console.log('[Discount] 📥 Customer lookup response:', JSON.stringify(customerResult, null, 2));
     
-    const customerId = customerResult.data?.customers?.edges?.[0]?.node?.id;
+    let customerId = customerResult.data?.customers?.edges?.[0]?.node?.id;
     
     if (!customerId) {
-      console.warn(`[Discount] ⚠️  Customer ${email} not found in Shopify`);
-      return {
-        success: false,
-        error: 'Customer not found in Shopify. Customer must exist before creating automatic discount.',
-        discountCode,
-        discountValue: discountAmount
-      };
+      console.warn(`[Discount] ⚠️  Customer ${email} not found in Shopify - creating customer...`);
+      
+      // Create customer first
+      const createCustomerMutation = `
+        mutation customerCreate($input: CustomerInput!) {
+          customerCreate(input: $input) {
+            customer {
+              id
+              email
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+      
+      const createCustomerResponse = await fetch(`https://${shopUrl}/admin/api/2024-01/graphql.json`, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: createCustomerMutation,
+          variables: {
+            input: {
+              email: email
+            }
+          }
+        })
+      });
+      
+      const createResult = await createCustomerResponse.json();
+      console.log('[Discount] 📥 Customer creation response:', JSON.stringify(createResult, null, 2));
+      
+      if (createResult.data?.customerCreate?.customer?.id) {
+        customerId = createResult.data.customerCreate.customer.id;
+        console.log(`[Discount] ✅ Created customer with ID: ${customerId}`);
+      } else {
+        console.error(`[Discount] ❌ Failed to create customer:`, createResult.data?.customerCreate?.userErrors);
+        return {
+          success: false,
+          error: 'Failed to create customer in Shopify.',
+          discountCode,
+          discountValue: discountAmount
+        };
+      }
+    } else {
+      console.log(`[Discount] ✅ Found customer ID: ${customerId}`);
     }
-    
-    console.log(`[Discount] ✅ Found customer ID: ${customerId}`);
     
     // Create AUTOMATIC discount (no code needed)
     console.log(`[Discount] 🔑 Creating automatic discount (no code)...`);
