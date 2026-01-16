@@ -410,8 +410,31 @@
     cartTotal: 0,
     coinValue: 1, // 1 coin = ₹1 (changed from 0.01)
     
-    // Load saved email from localStorage
+    // Load saved email from localStorage or logged-in customer
     init: function() {
+      // Check if customer is logged in (Shopify provides this)
+      {% if customer %}
+      const loggedInEmail = {{ customer.email | json }};
+      if (loggedInEmail) {
+        console.log('[Wallet Widget] Customer logged in:', loggedInEmail);
+        this.currentEmail = loggedInEmail;
+        
+        // Save to localStorage
+        localStorage.setItem('walletEmail', loggedInEmail);
+        
+        // Load balance from server
+        setTimeout(() => {
+          const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+          if (emailInput) {
+            emailInput.value = loggedInEmail;
+          }
+          this.checkBalance();
+        }, 500);
+        return;
+      }
+      {% endif %}
+      
+      // Fallback: check localStorage for saved session
       const savedEmail = localStorage.getItem('walletEmail');
       const savedBalance = localStorage.getItem('walletBalance');
       
@@ -722,7 +745,14 @@
           
           const finalCode = data.discountCode || discountCode;
           
-          if (data.requiresManualSetup) {
+          if (data.isExisting) {
+            // Customer already has an active code
+            this.showMessage(`You already have an active code: ${finalCode}. Redirecting...`, 'success');
+            setTimeout(() => {
+              console.log('[Wallet Widget] 🚀 Redirecting to checkout with existing code:', finalCode);
+              window.location.href = '/checkout?discount=' + finalCode;
+            }, 2000);
+          } else if (data.requiresManualSetup) {
             this.showMessage(`Code ${finalCode} created! Please create this discount in Shopify admin for ₹${discountAmount}. Redirecting...`, 'success');
             console.log('[Wallet Widget] ⚠️  Manual setup required - create discount in Shopify admin');
             console.log('[Wallet Widget] 💡 Code:', finalCode, '| Amount: ₹' + discountAmount);

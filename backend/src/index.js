@@ -548,13 +548,35 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
       });
     }
     
+    // Check if this customer already has an active unused discount code
+    const existingCodeCheck = await db.query(`
+      SELECT * FROM discount_codes 
+      WHERE store_url = $1 AND customer_email = $2 AND is_used = FALSE AND expires_at > NOW()
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [shopUrl, email]);
+    
+    if (existingCodeCheck.rows.length > 0) {
+      const existingCode = existingCodeCheck.rows[0];
+      console.log('[API] Customer already has active code:', existingCode.discount_code);
+      
+      return res.json({
+        success: true,
+        discountCode: existingCode.discount_code,
+        discountValue: parseFloat(existingCode.discount_amount),
+        newBalance: currentBalance, // Don't deduct again
+        message: `You already have an active discount code: ${existingCode.discount_code}`,
+        isExisting: true
+      });
+    }
+    
     // Try to create Shopify discount code
     console.log('[API] Attempting to create Shopify discount...');
     const discountResult = await createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmount, discountCode);
     
     console.log('[API] Discount result:', discountResult);
     
-    // Deduct coins immediately (even if discount creation fails, we'll handle it)
+    // Deduct coins
     const newBalance = currentBalance - coinsToRedeem;
     await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2', [newBalance, wallet.id]);
     
@@ -563,6 +585,13 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
       INSERT INTO transactions (wallet_id, store_url, order_id, coins, type, status)
       VALUES ($1, $2, $3, $4, 'DEBIT', 'PENDING')
     `, [wallet.id, shopUrl, discountResult.discountCode || discountCode, coinsToRedeem]);
+    
+    // Store discount code in database
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await db.query(`
+      INSERT INTO discount_codes (store_url, discount_code, customer_email, coins_redeemed, discount_amount, expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [shopUrl, discountResult.discountCode || discountCode, email, coinsToRedeem, discountAmount, expiresAt]);
     
     console.log('[API] ✅ Coins deducted. New balance:', newBalance);
     
