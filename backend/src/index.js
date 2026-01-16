@@ -568,12 +568,30 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
       VALUES ($1, $2, $3, $4, 'DEBIT', 'PENDING')
     `, [wallet.id, shopUrl, discountResult.discountCode || discountCode, coinsToRedeem]);
     
-    // Store discount code in database
+    // Store discount code in database with verification data
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const verifiedAt = discountResult.verified ? new Date() : null;
+    
     await db.query(`
-      INSERT INTO discount_codes (store_url, discount_code, customer_email, coins_redeemed, discount_amount, expires_at)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [shopUrl, discountResult.discountCode || discountCode, email, coinsToRedeem, discountAmount, expiresAt]);
+      INSERT INTO discount_codes (
+        store_url, discount_code, customer_email, coins_redeemed, discount_amount,
+        actual_discount_amount, shopify_discount_id, amount_verified, amount_mismatch,
+        verified_at, expires_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `, [
+      shopUrl,
+      discountResult.discountCode || discountCode,
+      email,
+      coinsToRedeem,
+      discountAmount,
+      discountResult.actualDiscountValue || discountAmount,
+      discountResult.discountId || null,
+      discountResult.verified || false,
+      discountResult.amountMismatch || false,
+      verifiedAt,
+      expiresAt
+    ]);
     
     console.log('[API] ✅ Coins deducted. New balance:', newBalance);
     
