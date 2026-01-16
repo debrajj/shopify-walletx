@@ -548,27 +548,9 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
       });
     }
     
-    // Check if this customer already has an active unused discount code
-    const existingCodeCheck = await db.query(`
-      SELECT * FROM discount_codes 
-      WHERE store_url = $1 AND customer_email = $2 AND is_used = FALSE AND expires_at > NOW()
-      ORDER BY created_at DESC
-      LIMIT 1
-    `, [shopUrl, email]);
-    
-    if (existingCodeCheck.rows.length > 0) {
-      const existingCode = existingCodeCheck.rows[0];
-      console.log('[API] Customer already has active code:', existingCode.discount_code);
-      
-      return res.json({
-        success: true,
-        discountCode: existingCode.discount_code,
-        discountValue: parseFloat(existingCode.discount_amount),
-        newBalance: currentBalance, // Don't deduct again
-        message: `You already have an active discount code: ${existingCode.discount_code}`,
-        isExisting: true
-      });
-    }
+    // Don't check for existing codes - always create new automatic discount
+    // This ensures customers get fresh automatic discounts each time
+    console.log('[API] Creating new automatic discount for customer:', email);
     
     // Try to create Shopify discount code
     console.log('[API] Attempting to create Shopify discount...');
