@@ -396,7 +396,7 @@
 
 <script>
 (function() {
-  const WIDGET_VERSION = '2.2.0'; // Version with cart total update
+  const WIDGET_VERSION = '2.2.1'; // Version with Ella theme support
   console.log('[Wallet Widget] Version:', WIDGET_VERSION);
   
   if (window.walletAppEmbed) return; // Already initialized
@@ -612,6 +612,7 @@
     updateThemeCartTotal: function(newTotal, savings) {
       // Find common cart total selectors used by Shopify themes
       const totalSelectors = [
+        '.cart-total-value', // Ella theme and similar
         '.cart__footer .totals__total-value',
         '.cart-footer__total',
         '[data-cart-total]',
