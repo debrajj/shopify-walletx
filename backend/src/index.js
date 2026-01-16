@@ -767,7 +767,7 @@ app.get('/api/transactions', requireAdminAuth, async (req, res) => {
 
     let query = `
       SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at,
-             w.customer_name, w.customer_phone 
+             w.customer_name, w.customer_phone, w.customer_email 
       FROM transactions t
       JOIN wallets w ON t.wallet_id = w.id
       WHERE t.store_url = $1
@@ -775,7 +775,7 @@ app.get('/api/transactions', requireAdminAuth, async (req, res) => {
     const params = [shopUrl];
 
     if (search) {
-      query += ` AND (w.customer_name ILIKE $2 OR t.order_id ILIKE $2 OR w.customer_phone ILIKE $2)`;
+      query += ` AND (w.customer_name ILIKE $2 OR t.order_id ILIKE $2 OR w.customer_phone ILIKE $2 OR w.customer_email ILIKE $2)`;
       params.push(`%${search}%`);
     }
 
@@ -817,7 +817,7 @@ app.get('/api/transactions/all', requireAdminAuth, async (req, res) => {
     // Limit to 1000 for safety
     const result = await db.query(`
       SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at, 
-             w.customer_name, w.customer_phone 
+             w.customer_name, w.customer_phone, w.customer_email 
       FROM transactions t
       JOIN wallets w ON t.wallet_id = w.id
       WHERE t.store_url = $1
@@ -990,10 +990,10 @@ app.get('/api/customers/:id/transactions', requireAdminAuth, async (req, res) =>
     
     const result = await db.query(`
       SELECT t.id::text, t.wallet_id::text, t.order_id, t.coins, t.type, t.status, t.order_amount, t.expires_at, t.created_at,
-             w.customer_name, w.customer_phone
+             w.customer_name, w.customer_phone, w.customer_email
       FROM transactions t
       JOIN wallets w ON t.wallet_id = w.id
-      WHERE t.store_url = $1 AND (w.id::text = $2 OR w.customer_phone = $2)
+      WHERE t.store_url = $1 AND (w.id::text = $2 OR w.customer_phone = $2 OR w.customer_email = $2)
       ORDER BY t.created_at DESC
     `, [shopUrl, id]);
     res.json(result.rows);

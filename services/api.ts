@@ -23,6 +23,11 @@ const getActiveConfig = (): { baseUrl: string; headers: Record<string, string> }
     }
   }
   
+  // Fallback to default store for testing
+  if (!headers['x-shop-url']) {
+    headers['x-shop-url'] = 'cmstestingg.myshopify.com';
+  }
+  
   return { baseUrl, headers };
 };
 
@@ -44,13 +49,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let data;
   
   try {
-    data = text ? JSON.parse(text) : {};
+    data = text ? JSON.parse(text) : null;
   } catch (jsonError) {
     throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
   }
 
   if (!response.ok) {
-    throw new Error(data.error || `Server returned ${response.status}`);
+    throw new Error(data?.error || `Server returned ${response.status}`);
   }
 
   return data;

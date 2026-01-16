@@ -27,17 +27,25 @@ const Customers: React.FC = () => {
     setTransactions([]);
 
     try {
+      console.log('[Customer Search] Searching for:', searchTerm);
+      
       // 1. Search for customer first
       const custData = await api.searchCustomer(searchTerm);
+      console.log('[Customer Search] API Response:', custData);
+      
       setCustomer(custData);
 
       // 2. If customer exists, fetch their transactions using the real ID
       if (custData && custData.id) {
+         console.log('[Customer Search] Fetching transactions for ID:', custData.id);
          const txData = await api.getCustomerTransactions(custData.id);
+         console.log('[Customer Search] Transactions:', txData.length);
          setTransactions(txData);
+      } else {
+         console.log('[Customer Search] No customer found');
       }
     } catch (err) {
-      console.error(err);
+      console.error('[Customer Search] Error:', err);
     } finally {
       setLoading(false);
     }
@@ -50,14 +58,14 @@ const Customers: React.FC = () => {
     setAddCoinsStatus('SUBMITTING');
     try {
       await api.addCoins({
-        phone: customer.phone,
+        phone: customer.phone || customer.email || '',
         coins: parseFloat(addCoinsForm.coins),
         description: addCoinsForm.description || 'Manual addition via Customer Profile'
       });
       setAddCoinsStatus('SUCCESS');
       
       // Refresh customer data
-      const updatedCust = await api.searchCustomer(customer.phone);
+      const updatedCust = await api.searchCustomer(customer.phone || customer.email || '');
       if (updatedCust && updatedCust.id) {
         setCustomer(updatedCust);
         const txData = await api.getCustomerTransactions(updatedCust.id);
@@ -93,7 +101,7 @@ const Customers: React.FC = () => {
             <input
               type="text"
               className="block w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
-              placeholder="Search by phone number or name..."
+              placeholder="Search by phone, email, or name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -126,7 +134,7 @@ const Customers: React.FC = () => {
                 <h2 className="text-xl font-bold text-slate-900">{customer.name}</h2>
                 <div className="flex items-center gap-2 text-slate-500 mt-1">
                   <Phone className="h-4 w-4" />
-                  <span>{customer.phone}</span>
+                  <span>{customer.phone || customer.email}</span>
                 </div>
               </div>
             </div>
@@ -206,7 +214,7 @@ const Customers: React.FC = () => {
                 <form onSubmit={handleAddCoins} className="p-6 space-y-4">
                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
                       <p className="text-sm text-slate-500">Adding to wallet of:</p>
-                      <p className="font-semibold text-slate-900">{customer.name} <span className="text-slate-400 font-normal">({customer.phone})</span></p>
+                      <p className="font-semibold text-slate-900">{customer.name} <span className="text-slate-400 font-normal">({customer.phone || customer.email})</span></p>
                    </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Amount (Coins)</label>

@@ -11,7 +11,8 @@ export interface Transaction {
   id: string;
   order_id: string;
   customer_name: string;
-  customer_phone: string;
+  customer_phone: string | null;
+  customer_email?: string | null;
   coins: number;
   type: 'CREDIT' | 'DEBIT';
   status: 'COMPLETED' | 'PENDING' | 'FAILED';
@@ -64,7 +65,8 @@ export interface DashboardStats {
 export interface CustomerSummary {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
+  email: string | null;
   balance: number;
   total_orders: number;
   total_spent: number;

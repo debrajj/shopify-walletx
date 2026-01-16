@@ -39,7 +39,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, showE
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-slate-900">{txn.customer_name}</span>
-                    <span className="text-xs text-slate-500">{txn.customer_phone}</span>
+                    <span className="text-xs text-slate-500">{txn.customer_phone || txn.customer_email || '-'}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
