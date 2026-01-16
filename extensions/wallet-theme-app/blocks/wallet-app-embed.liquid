@@ -396,7 +396,7 @@
 
 <script>
 (function() {
-  const WIDGET_VERSION = '2.1.0'; // Version with savings display
+  const WIDGET_VERSION = '2.2.0'; // Version with cart total update
   console.log('[Wallet Widget] Version:', WIDGET_VERSION);
   
   if (window.walletAppEmbed) return; // Already initialized
@@ -597,10 +597,76 @@
         savingsAmount.textContent = '₹' + savings.toFixed(2);
         newTotalEl.textContent = '₹' + newTotal.toFixed(2);
         savingsDisplay.style.display = 'flex';
+        
+        // Update the theme's cart total display
+        this.updateThemeCartTotal(newTotal, savings);
       } else {
         console.log('[Wallet Widget] Hiding savings display');
         savingsDisplay.style.display = 'none';
+        
+        // Restore original cart total
+        this.restoreThemeCartTotal();
       }
+    },
+    
+    updateThemeCartTotal: function(newTotal, savings) {
+      // Find common cart total selectors used by Shopify themes
+      const totalSelectors = [
+        '.cart__footer .totals__total-value',
+        '.cart-footer__total',
+        '[data-cart-total]',
+        '.cart__total',
+        '.cart-total',
+        '.totals__total',
+        '.cart-drawer__footer .totals__total-value',
+        '.drawer__footer .totals__total-value',
+        '#cart-total',
+        '.js-contents .totals__total-value'
+      ];
+      
+      let updated = false;
+      
+      for (const selector of totalSelectors) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+          if (el && !el.hasAttribute('data-original-total')) {
+            // Save original total
+            el.setAttribute('data-original-total', el.textContent);
+            
+            // Update with new total
+            const formattedTotal = '₹' + newTotal.toFixed(2);
+            el.textContent = formattedTotal;
+            
+            // Add visual indicator
+            el.style.color = '#10b981'; // Green color
+            el.style.fontWeight = 'bold';
+            
+            console.log('[Wallet Widget] Updated cart total:', selector, formattedTotal);
+            updated = true;
+          }
+        });
+      }
+      
+      if (!updated) {
+        console.warn('[Wallet Widget] Could not find cart total element to update');
+      }
+    },
+    
+    restoreThemeCartTotal: function() {
+      // Restore all modified cart totals
+      const modifiedElements = document.querySelectorAll('[data-original-total]');
+      
+      modifiedElements.forEach(el => {
+        const originalTotal = el.getAttribute('data-original-total');
+        if (originalTotal) {
+          el.textContent = originalTotal;
+          el.removeAttribute('data-original-total');
+          el.style.color = '';
+          el.style.fontWeight = '';
+          
+          console.log('[Wallet Widget] Restored cart total:', originalTotal);
+        }
+      });
     },
     
     showMessage: function(text, type) {
