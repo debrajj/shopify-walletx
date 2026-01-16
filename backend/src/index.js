@@ -957,9 +957,9 @@ app.get('/api/customers/search', requireAdminAuth, async (req, res) => {
     if (!q) return res.json(null);
 
     const result = await db.query(`
-      SELECT id::text, phone_hash, customer_name as name, customer_phone as phone, balance 
+      SELECT id::text, phone_hash, customer_name as name, customer_phone as phone, customer_email as email, balance 
       FROM wallets 
-      WHERE store_url = $1 AND (customer_name ILIKE $2 OR customer_phone ILIKE $2)
+      WHERE store_url = $1 AND (customer_name ILIKE $2 OR customer_phone ILIKE $2 OR customer_email ILIKE $2)
       LIMIT 1
     `, [shopUrl, `%${q}%`]);
 
