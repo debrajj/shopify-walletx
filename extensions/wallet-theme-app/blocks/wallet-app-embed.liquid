@@ -817,7 +817,14 @@
           
           const finalCode = data.discountCode || discountCode;
           
-          if (data.isExisting) {
+          if (data.isAutomatic) {
+            // Automatic discount - no code needed, just go to checkout
+            this.showMessage(`₹${discountAmount} discount will apply automatically! Redirecting...`, 'success');
+            setTimeout(() => {
+              console.log('[Wallet Widget] 🚀 Redirecting to checkout (automatic discount)');
+              window.location.href = '/checkout';
+            }, 1500);
+          } else if (data.isExisting) {
             // Customer already has an active code
             this.showMessage(`You already have an active code: ${finalCode}. Redirecting...`, 'success');
             setTimeout(() => {
@@ -827,11 +834,12 @@
           } else if (data.requiresManualSetup) {
             this.showMessage(`Code ${finalCode} created! Please create this discount in Shopify admin for ₹${discountAmount}. Redirecting...`, 'success');
             console.log('[Wallet Widget] ⚠️  Manual setup required - create discount in Shopify admin');
-            console.log('[Wallet Widget] 💡 Code:', finalCode, '| Amount: ₹' + discountAmount);
+            console.log('[Wallet Widget] � CoRde:', finalCode, '| Amount: ₹' + discountAmount);
             setTimeout(() => {
               window.location.href = '/checkout?discount=' + finalCode;
             }, 3000);
           } else {
+            // Discount code created
             this.showMessage(`₹${discountAmount} discount applied! Redirecting...`, 'success');
             setTimeout(() => {
               console.log('[Wallet Widget] 🚀 Redirecting to checkout with code:', finalCode);
