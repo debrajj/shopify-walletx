@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Customer Search - Clear Session</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2d3748;
+            margin-top: 0;
+            font-size: 24px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .info {
+            background: #ebf8ff;
+            color: #2c5282;
+            border-left: 4px solid #3182ce;
+        }
+        .success {
+            background: #f0fff4;
+            color: #22543d;
+            border-left: 4px solid #38a169;
+        }
+        .warning {
+            background: #fffaf0;
+            color: #744210;
+            border-left: 4px solid #ed8936;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .secondary {
+            background: #48bb78;
+        }
+        .secondary:hover {
+            background: #38a169;
+        }
+        code {
+            background: #f7fafc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            color: #e53e3e;
+        }
+        .step {
+            margin: 15px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+        .step::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #48bb78;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔧 Fix Customer Search Issue</h1>
+        
+        <div class="status info" id="status">
+            <strong>Current Status:</strong> Checking your session...
+        </div>
+        
+        <div id="currentSession"></div>
+        
+        <button onclick="clearAndReload()">
+            🗑️ Clear Session & Reload
+        </button>
+        
+        <button onclick="fixSession()" class="secondary">
+            🔧 Fix Session (Keep Login)
+        </button>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
+            <h3 style="color: #2d3748; font-size: 18px;">What This Does:</h3>
+            
+            <div class="step">
+                Clears your old session data with mismatched store URL
+            </div>
+            <div class="step">
+                Sets the correct store URL: <code>cmstestingg.myshopify.com</code>
+            </div>
+            <div class="step">
+                Reloads the app so customer search works correctly
+            </div>
+        </div>
+        
+        <div class="status warning" style="margin-top: 20px; font-size: 14px;">
+            <strong>Note:</strong> After clicking, you'll be redirected to the app. 
+            Go to <strong>Customers</strong> section and search for <code>debrajecomcure@gmail.com</code> to verify it works!
+        </div>
+    </div>
+    
+    <script>
+        // Check current session
+        function checkSession() {
+            const userStr = localStorage.getItem('shopwallet_user');
+            const statusDiv = document.getElementById('status');
+            const sessionDiv = document.getElementById('currentSession');
+            
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    const storeUrl = user.storeUrl || 'Not set';
+                    const normalized = storeUrl.replace(/^https?:\/\//, '');
+                    
+                    if (normalized === 'cmstestingg.myshopify.com') {
+                        statusDiv.className = 'status success';
+                        statusDiv.innerHTML = '<strong>✅ Session is correct!</strong> Your store URL is properly configured.';
+                        sessionDiv.innerHTML = `
+                            <div style="margin: 15px 0; padding: 15px; background: #f7fafc; border-radius: 8px;">
+                                <strong>Current User:</strong> ${user.email || 'Unknown'}<br>
+                                <strong>Store URL:</strong> <code>${storeUrl}</code>
+                            </div>
+                        `;
+                    } else {
+                        statusDiv.className = 'status warning';
+                        statusDiv.innerHTML = '<strong>⚠️ Session needs fixing!</strong> Your store URL format is incorrect.';
+                        sessionDiv.innerHTML = `
+                            <div style="margin: 15px 0; padding: 15px; background: #fffaf0; border-radius: 8px;">
+                                <strong>Current User:</strong> ${user.email || 'Unknown'}<br>
+                                <strong>Current Store URL:</strong> <code>${storeUrl}</code><br>
+                                <strong>Should be:</strong> <code>cmstestingg.myshopify.com</code>
+                            </div>
+                        `;
+                    }
+                } catch (e) {
+                    statusDiv.className = 'status warning';
+                    statusDiv.innerHTML = '<strong>⚠️ Invalid session data!</strong> Click below to fix.';
+                }
+            } else {
+                statusDiv.className = 'status info';
+                statusDiv.innerHTML = '<strong>ℹ️ No session found.</strong> The app will use default settings.';
+            }
+        }
+        
+        function clearAndReload() {
+            localStorage.clear();
+            alert('✅ Session cleared! Redirecting to app...');
+            window.location.href = 'http://localhost:5173';
+        }
+        
+        function fixSession() {
+            const userStr = localStorage.getItem('shopwallet_user');
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    user.storeUrl = 'cmstestingg.myshopify.com';
+                    localStorage.setItem('shopwallet_user', JSON.stringify(user));
+                    alert('✅ Session fixed! Redirecting to app...');
+                    window.location.href = 'http://localhost:5173';
+                } catch (e) {
+                    alert('❌ Error fixing session. Clearing instead...');
+                    clearAndReload();
+                }
+            } else {
+                alert('ℹ️ No session to fix. Redirecting to app...');
+                window.location.href = 'http://localhost:5173';
+            }
+        }
+        
+        // Check on load
+        checkSession();
+    </script>
+</body>
+</html>

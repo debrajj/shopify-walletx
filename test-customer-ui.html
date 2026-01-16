@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Customer Search Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        input {
+            padding: 10px;
+            width: 300px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        pre {
+            background: #fff;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Customer Search Test</h1>
+    
+    <div>
+        <input type="text" id="searchInput" placeholder="Enter name or email" value="debraj">
+        <button onclick="searchCustomer()">Search</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        const API_BASE = 'https://shopify-walletx.onrender.com/api';
+        const SHOP_URL = 'cmstestingg.myshopify.com';
+        
+        async function searchCustomer() {
+            const searchTerm = document.getElementById('searchInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = '<p>Searching...</p>';
+            
+            try {
+                console.log('[Test] Searching for:', searchTerm);
+                console.log('[Test] URL:', `${API_BASE}/customers/search?q=${encodeURIComponent(searchTerm)}`);
+                console.log('[Test] Headers:', { 'x-shop-url': SHOP_URL });
+                
+                const response = await fetch(`${API_BASE}/customers/search?q=${encodeURIComponent(searchTerm)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-shop-url': SHOP_URL
+                    }
+                });
+                
+                console.log('[Test] Response status:', response.status);
+                
+                const text = await response.text();
+                console.log('[Test] Response text:', text);
+                
+                const data = text ? JSON.parse(text) : null;
+                console.log('[Test] Parsed data:', data);
+                
+                if (data && data.id) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        <h2>✅ Customer Found!</h2>
+                        <p><strong>Name:</strong> ${data.name}</p>
+                        <p><strong>Email:</strong> ${data.email || 'N/A'}</p>
+                        <p><strong>Phone:</strong> ${data.phone || 'N/A'}</p>
+                        <p><strong>Balance:</strong> ${data.balance} coins</p>
+                        <p><strong>Total Orders:</strong> ${data.total_orders}</p>
+                        <p><strong>Coins Used:</strong> ${data.total_coins_used}</p>
+                        <h3>Raw Response:</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = `
+                        <h2>❌ Customer Not Found</h2>
+                        <p>API returned: ${data === null ? 'null' : 'unexpected data'}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+                
+            } catch (err) {
+                console.error('[Test] Error:', err);
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `
+                    <h2>❌ Error</h2>
+                    <p>${err.message}</p>
+                    <pre>${err.stack}</pre>
+                `;
+            }
+        }
+        
+        // Auto-search on load
+        window.onload = () => searchCustomer();
+    </script>
+</body>
+</html>
