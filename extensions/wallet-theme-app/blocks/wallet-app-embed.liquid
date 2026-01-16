@@ -68,6 +68,18 @@
           </button>
         </div>
         <p class="wallet-hint">Click arrow or press Enter to checkout with discount</p>
+        
+        <!-- Savings Display -->
+        <div id="wallet-embed-savings" class="wallet-savings-display" style="display: none;">
+          <div class="wallet-savings-row">
+            <span class="wallet-savings-label">💰 You'll save</span>
+            <span class="wallet-savings-value" id="wallet-embed-savings-amount">₹0</span>
+          </div>
+          <div class="wallet-savings-row">
+            <span class="wallet-savings-label">New total</span>
+            <span class="wallet-savings-value wallet-new-total-value" id="wallet-embed-new-total">₹0</span>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -173,6 +185,52 @@
     color: #6d7175;
     margin: 8px 0 0 0;
     font-style: italic;
+  }
+
+  .wallet-savings-display {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 1px solid #9dd084;
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .wallet-savings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .wallet-savings-label {
+    font-size: 13px;
+    color: #155724;
+    font-weight: 500;
+  }
+
+  .wallet-savings-value {
+    font-size: 15px;
+    color: #155724;
+    font-weight: 700;
+  }
+
+  .wallet-new-total-value {
+    font-size: 17px;
+    color: #0f5132;
   }
 
   .wallet-coins-input-wrapper {
@@ -401,6 +459,9 @@
           if (parseInt(coinsInput.value) > maxCoins) {
             coinsInput.value = maxCoins;
           }
+          
+          // Update savings display
+          this.updateSavingsDisplay();
         });
         
         // Apply coins on Enter key
@@ -473,6 +534,31 @@
         const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
         coinsInput.setAttribute('max', maxCoins);
         coinsInput.setAttribute('placeholder', `Max: ${maxCoins} coins`);
+      }
+      
+      // Update savings display if coins are entered
+      this.updateSavingsDisplay();
+    },
+    
+    updateSavingsDisplay: function() {
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      const savingsDisplay = document.querySelector('#wallet-app-embed-injected #wallet-embed-savings');
+      const savingsAmount = document.querySelector('#wallet-app-embed-injected #wallet-embed-savings-amount');
+      const newTotalEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-new-total');
+      
+      if (!coinsInput || !savingsDisplay || !savingsAmount || !newTotalEl) return;
+      
+      const coinsToUse = parseInt(coinsInput.value) || 0;
+      
+      if (coinsToUse > 0 && coinsToUse <= this.currentBalance) {
+        const savings = coinsToUse * this.coinValue;
+        const newTotal = Math.max(0, this.cartTotal - savings);
+        
+        savingsAmount.textContent = '₹' + savings.toFixed(2);
+        newTotalEl.textContent = '₹' + newTotal.toFixed(2);
+        savingsDisplay.style.display = 'flex';
+      } else {
+        savingsDisplay.style.display = 'none';
       }
     },
     
