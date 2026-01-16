@@ -183,28 +183,12 @@ const requireStorefrontAuth = async (req, res, next) => {
     return res.status(400).json({ error: 'Missing x-shop-url header or shop query param' });
   }
 
-  // Normalize shop URL - remove http:// or https://
+  // Normalize shop URL - ALWAYS remove http:// or https://
   shopUrl = shopUrl.replace(/^https?:\/\//, '');
 
   try {
-    // Try exact match first
-    let result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [shopUrl]);
-    
-    // If not found, try with https:// prefix
-    if (result.rows.length === 0) {
-      result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [`https://${shopUrl}`]);
-      if (result.rows.length > 0) {
-        shopUrl = `https://${shopUrl}`;
-      }
-    }
-    
-    // If still not found, try with http:// prefix
-    if (result.rows.length === 0) {
-      result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [`http://${shopUrl}`]);
-      if (result.rows.length > 0) {
-        shopUrl = `http://${shopUrl}`;
-      }
-    }
+    // Look up with normalized URL
+    const result = await db.query('SELECT store_url FROM users WHERE store_url = $1', [shopUrl]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Store not registered with ShopWallet' });
@@ -291,13 +275,16 @@ app.post('/api/auth/signup', async (req, res) => {
   try {
     const { name, email, password, storeName, storeUrl, shopifyAccessToken, shopifyApiKey } = req.body;
 
+    // Normalize store URL - remove http:// or https://
+    const normalizedStoreUrl = storeUrl ? storeUrl.replace(/^https?:\/\//, '') : storeUrl;
+
     // Validate Input
-    if (!storeUrl || !shopifyAccessToken) {
+    if (!normalizedStoreUrl || !shopifyAccessToken) {
         return res.status(400).json({ error: 'Shopify Store URL and Access Token are required' });
     }
 
     // Check if user/store exists
-    const check = await db.query('SELECT * FROM users WHERE email = $1 OR store_url = $2', [email, storeUrl]);
+    const check = await db.query('SELECT * FROM users WHERE email = $1 OR store_url = $2', [email, normalizedStoreUrl]);
     if (check.rows.length > 0) {
       return res.status(400).json({ error: 'User or Store URL already registered' });
     }
@@ -310,12 +297,12 @@ app.post('/api/auth/signup', async (req, res) => {
       INSERT INTO users (name, email, password_hash, store_name, store_url, shopify_access_token, shopify_api_key)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id::text, name, email, store_name, store_url
-    `, [name, email, hash, storeName, storeUrl, shopifyAccessToken, shopifyApiKey]);
+    `, [name, email, hash, storeName, normalizedStoreUrl, shopifyAccessToken, shopifyApiKey]);
 
     // Create Default Settings for Tenant
     await db.query(`
       INSERT INTO app_settings (store_url, is_wallet_enabled) VALUES ($1, true)
-    `, [storeUrl]);
+    `, [normalizedStoreUrl]);
 
     res.status(201).json({
       user: result.rows[0]

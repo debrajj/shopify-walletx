@@ -16,7 +16,9 @@ const getActiveConfig = (): { baseUrl: string; headers: Record<string, string> }
     try {
       const user = JSON.parse(userStr);
       if (user.storeUrl) {
-        headers['x-shop-url'] = user.storeUrl;
+        // Normalize: remove http:// or https:// prefix
+        const normalizedUrl = user.storeUrl.replace(/^https?:\/\//, '');
+        headers['x-shop-url'] = normalizedUrl;
       }
     } catch (e) {
       // ignore
@@ -35,6 +37,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const { baseUrl, headers: customHeaders } = getActiveConfig();
   const url = `${baseUrl}${path}`;
 
+  console.log('[API Request]', {
+    url,
+    method: options?.method || 'GET',
+    headers: { ...customHeaders, ...(options?.headers || {}) }
+  });
+
   const response = await fetch(url, {
     ...options,
     headers: { 
@@ -46,15 +54,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   // Check if response has content before trying to parse JSON
   const text = await response.text();
+  console.log('[API Response]', {
+    url,
+    status: response.status,
+    body: text.substring(0, 200)
+  });
+  
   let data;
   
   try {
     data = text ? JSON.parse(text) : null;
   } catch (jsonError) {
+    console.error('[API Parse Error]', jsonError);
     throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
   }
 
   if (!response.ok) {
+    console.error('[API Error]', { status: response.status, data });
     throw new Error(data?.error || `Server returned ${response.status}`);
   }
 
