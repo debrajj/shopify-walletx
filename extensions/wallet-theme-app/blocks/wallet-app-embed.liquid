@@ -49,6 +49,9 @@
     
     <div id="wallet-embed-redeem" class="wallet-embed-redeem" style="display: none;">
       <div class="wallet-coins-input-wrapper">
+        <button class="wallet-coin-adjust-button" data-wallet-action="decrease-coins" title="Decrease coins">
+          −
+        </button>
         <input 
           type="number" 
           id="wallet-embed-coins-input" 
@@ -56,6 +59,9 @@
           class="wallet-embed-input wallet-coins-input"
           min="0"
         />
+        <button class="wallet-coin-adjust-button" data-wallet-action="increase-coins" title="Increase coins">
+          +
+        </button>
         <button class="wallet-apply-arrow-button" data-wallet-action="apply-coins" title="Apply coins">
           →
         </button>
@@ -210,6 +216,35 @@
 
   .wallet-coins-input {
     flex: 1;
+    text-align: center;
+  }
+
+  .wallet-coin-adjust-button {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .wallet-coin-adjust-button:hover {
+    background: #e0e0e0;
+    border-color: #ccc;
+  }
+
+  .wallet-coin-adjust-button:active {
+    background: #d0d0d0;
+    transform: scale(0.95);
   }
 
   .wallet-apply-arrow-button {
@@ -475,7 +510,31 @@
       
       if (displayContainer) displayContainer.style.display = 'none';
       if (redeemContainer) redeemContainer.style.display = 'block';
-      if (coinsInput) coinsInput.focus();
+      if (coinsInput) {
+        coinsInput.value = ''; // Clear input
+        coinsInput.focus();
+      }
+    },
+    
+    increaseCoins: function() {
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      if (!coinsInput) return;
+      
+      const currentValue = parseInt(coinsInput.value) || 0;
+      const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
+      const newValue = Math.min(currentValue + 10, maxCoins); // Increase by 10
+      
+      coinsInput.value = newValue;
+    },
+    
+    decreaseCoins: function() {
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      if (!coinsInput) return;
+      
+      const currentValue = parseInt(coinsInput.value) || 0;
+      const newValue = Math.max(currentValue - 10, 0); // Decrease by 10, min 0
+      
+      coinsInput.value = newValue;
     },
     
     refreshBalance: async function() {
@@ -955,6 +1014,28 @@
         walletAppEmbed.showRedeemForm();
       });
       console.log('[Wallet Widget] Redeem button handler attached');
+    }
+    
+    // Attach increase coins button handler
+    const increaseButton = clonedWidget.querySelector('[data-wallet-action="increase-coins"]');
+    if (increaseButton) {
+      increaseButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        walletAppEmbed.increaseCoins();
+      });
+      console.log('[Wallet Widget] Increase button handler attached');
+    }
+    
+    // Attach decrease coins button handler
+    const decreaseButton = clonedWidget.querySelector('[data-wallet-action="decrease-coins"]');
+    if (decreaseButton) {
+      decreaseButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        walletAppEmbed.decreaseCoins();
+      });
+      console.log('[Wallet Widget] Decrease button handler attached');
     }
     
     // Attach arrow button handler
