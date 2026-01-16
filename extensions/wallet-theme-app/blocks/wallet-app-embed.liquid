@@ -37,50 +37,30 @@
       </button>
     </div>
     
-    <div id="wallet-embed-balance" class="wallet-embed-balance" style="display: none;">
-      <div class="wallet-balance-info">
-        <div class="wallet-balance-row">
-          <span class="wallet-label">Available balance</span>
-          <span class="wallet-value" id="wallet-embed-balance-display">0 coins</span>
-        </div>
-        <div class="wallet-balance-row">
-          <span class="wallet-label">Cart total</span>
-          <span class="wallet-value" id="wallet-embed-cart-total">$0.00</span>
-        </div>
+    <div id="wallet-embed-display" class="wallet-embed-display" style="display: none;">
+      <div class="wallet-balance-section">
+        <div class="wallet-balance-label">Your balance</div>
+        <div class="wallet-balance-amount" id="wallet-embed-balance-display">815 points</div>
       </div>
-      
-      <div class="wallet-apply-section">
-        <label class="wallet-input-label" for="wallet-embed-coins-input">
-          Enter coins to redeem (1 coin = ₹1)
-        </label>
-        <div class="wallet-coins-input-wrapper">
-          <input 
-            type="number" 
-            id="wallet-embed-coins-input" 
-            placeholder="0"
-            class="wallet-embed-input wallet-coins-input"
-            min="0"
-          />
-          <button class="wallet-apply-arrow-button" data-wallet-action="apply-coins" title="Apply coins">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M4 10H16M16 10L11 5M16 10L11 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
-        <p class="wallet-hint">Click arrow or press Enter to checkout with discount</p>
-        
-        <!-- Savings Display -->
-        <div id="wallet-embed-savings" class="wallet-savings-display" style="display: none;">
-          <div class="wallet-savings-row">
-            <span class="wallet-savings-label">💰 You'll save</span>
-            <span class="wallet-savings-value" id="wallet-embed-savings-amount">₹0</span>
-          </div>
-          <div class="wallet-savings-row">
-            <span class="wallet-savings-label">New total</span>
-            <span class="wallet-savings-value wallet-new-total-value" id="wallet-embed-new-total">₹0</span>
-          </div>
-        </div>
+      <button class="wallet-redeem-button" data-wallet-action="show-redeem">
+        Redeem points
+      </button>
+    </div>
+    
+    <div id="wallet-embed-redeem" class="wallet-embed-redeem" style="display: none;">
+      <div class="wallet-coins-input-wrapper">
+        <input 
+          type="number" 
+          id="wallet-embed-coins-input" 
+          placeholder="Enter coins to redeem (1 coin = ₹1)"
+          class="wallet-embed-input wallet-coins-input"
+          min="0"
+        />
+        <button class="wallet-apply-arrow-button" data-wallet-action="apply-coins" title="Apply coins">
+          →
+        </button>
       </div>
+      <p class="wallet-hint">Click arrow or press Enter to checkout with discount</p>
     </div>
     
     <div id="wallet-embed-message" class="wallet-embed-message"></div>
@@ -120,6 +100,54 @@
     font-weight: 600;
     color: #202223;
     letter-spacing: -0.01em;
+  }
+
+  .wallet-embed-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 0;
+  }
+
+  .wallet-balance-section {
+    flex: 1;
+  }
+
+  .wallet-balance-label {
+    font-size: 14px;
+    color: #999;
+    margin-bottom: 4px;
+  }
+
+  .wallet-balance-amount {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+  }
+
+  .wallet-redeem-button {
+    padding: 12px 24px;
+    background: white;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .wallet-redeem-button:hover {
+    background: #fafafa;
+    border-color: #ccc;
+  }
+
+  .wallet-embed-redeem {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .wallet-embed-login {
@@ -167,70 +195,11 @@
     font-weight: 600;
   }
 
-  .wallet-apply-section {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .wallet-input-label {
-    font-size: 13px;
-    color: #202223;
-    font-weight: 500;
-    margin-bottom: -8px;
-  }
-
   .wallet-hint {
     font-size: 12px;
-    color: #6d7175;
-    margin: 8px 0 0 0;
-    font-style: italic;
-  }
-
-  .wallet-savings-display {
-    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    border: 1px solid #9dd084;
-    border-radius: 8px;
-    padding: 14px;
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    animation: slideIn 0.3s ease;
-  }
-
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .wallet-savings-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .wallet-savings-label {
-    font-size: 13px;
-    color: #155724;
-    font-weight: 500;
-  }
-
-  .wallet-savings-value {
-    font-size: 15px;
-    color: #155724;
-    font-weight: 700;
-  }
-
-  .wallet-new-total-value {
-    font-size: 17px;
-    color: #0f5132;
+    color: #666;
+    margin: 0;
+    text-align: center;
   }
 
   .wallet-coins-input-wrapper {
@@ -245,10 +214,10 @@
 
   .wallet-apply-arrow-button {
     flex-shrink: 0;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     padding: 0;
-    background: #202223;
+    background: #667eea;
     color: #ffffff;
     border: none;
     border-radius: 6px;
@@ -257,15 +226,17 @@
     align-items: center;
     justify-content: center;
     transition: all 0.15s ease;
+    font-size: 20px;
+    font-weight: bold;
   }
 
   .wallet-apply-arrow-button:hover {
-    background: #2c2e2f;
+    background: #5568d3;
     transform: translateX(2px);
   }
 
   .wallet-apply-arrow-button:active {
-    background: #44474a;
+    background: #4557c2;
     transform: translateX(4px);
   }
 
@@ -466,33 +437,25 @@
       this.currentBalance = balance;
       
       const balanceEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance-display');
-      const balanceContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance');
+      const displayContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-display');
       const loginContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-login');
       
-      if (balanceEl) balanceEl.textContent = balance + ' coins';
-      if (balanceContainer) balanceContainer.style.display = 'flex';
+      if (balanceEl) balanceEl.textContent = balance + ' points';
+      if (displayContainer) displayContainer.style.display = 'flex';
       if (loginContainer) loginContainer.style.display = 'none';
-      
-      // Update cart display
-      this.updateCartDisplay();
       
       // Set up coin input listener
       const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
       if (coinsInput) {
-        // Auto-limit input to max coins and update instantly
+        // Update cart total
+        this.updateCartDisplay();
+        
+        // Auto-limit input to max coins
         coinsInput.addEventListener('input', () => {
           const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
           if (parseInt(coinsInput.value) > maxCoins) {
             coinsInput.value = maxCoins;
           }
-          
-          // Update savings display instantly as user types
-          this.updateSavingsDisplay();
-        });
-        
-        // Also update on keyup for immediate feedback
-        coinsInput.addEventListener('keyup', () => {
-          this.updateSavingsDisplay();
         });
         
         // Apply coins on Enter key
@@ -503,6 +466,16 @@
           }
         });
       }
+    },
+    
+    showRedeemForm: function() {
+      const displayContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-display');
+      const redeemContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-redeem');
+      const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      
+      if (displayContainer) displayContainer.style.display = 'none';
+      if (redeemContainer) redeemContainer.style.display = 'block';
+      if (coinsInput) coinsInput.focus();
     },
     
     refreshBalance: async function() {
@@ -955,6 +928,18 @@
         walletAppEmbed.checkBalance();
       });
       console.log('[Wallet Widget] Check balance handler attached');
+    }
+    
+    // Attach redeem button handler
+    const redeemButton = clonedWidget.querySelector('[data-wallet-action="show-redeem"]');
+    if (redeemButton) {
+      redeemButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Wallet Widget] Redeem points clicked');
+        walletAppEmbed.showRedeemForm();
+      });
+      console.log('[Wallet Widget] Redeem button handler attached');
     }
     
     // Attach arrow button handler
