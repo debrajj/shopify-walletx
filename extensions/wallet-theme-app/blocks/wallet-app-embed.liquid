@@ -908,15 +908,16 @@
             console.log('[Wallet Widget] ⚠️  Manual setup required - create discount in Shopify admin');
             console.log('[Wallet Widget] Code:', finalCode, '| Amount: ₹' + discountAmount);
             setTimeout(() => {
-              window.location.href = '/checkout?discount=' + finalCode;
+              window.location.href = '/checkout?discount=' + encodeURIComponent(finalCode);
             }, 3000);
           } else {
-            // Discount created successfully
+            // Discount created successfully - apply code automatically
             this.showMessage(`₹${discountAmount} discount applied! Redirecting...`, 'success');
             setTimeout(() => {
-              console.log('[Wallet Widget] 🚀 Redirecting to checkout');
-              window.location.href = '/checkout';
-            }, 1000);
+              console.log('[Wallet Widget] 🚀 Redirecting to checkout with code:', finalCode);
+              // Apply discount code automatically via URL
+              window.location.href = '/checkout?discount=' + encodeURIComponent(finalCode);
+            }, 1500);
           }
           
         } else {
