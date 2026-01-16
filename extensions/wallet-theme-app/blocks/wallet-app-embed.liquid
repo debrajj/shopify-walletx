@@ -505,9 +505,16 @@
     },
     
     showRedeemForm: function() {
+      console.log('[Wallet Widget] showRedeemForm called');
       const displayContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-display');
       const redeemContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-redeem');
       const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
+      
+      console.log('[Wallet Widget] Elements found:', {
+        displayContainer: !!displayContainer,
+        redeemContainer: !!redeemContainer,
+        coinsInput: !!coinsInput
+      });
       
       if (displayContainer) displayContainer.style.display = 'none';
       if (redeemContainer) redeemContainer.style.display = 'block';
@@ -1007,6 +1014,7 @@
     
     // Attach redeem button handler
     const redeemButton = clonedWidget.querySelector('[data-wallet-action="show-redeem"]');
+    console.log('[Wallet Widget] Looking for redeem button:', !!redeemButton);
     if (redeemButton) {
       redeemButton.addEventListener('click', function(e) {
         e.preventDefault();
@@ -1015,6 +1023,8 @@
         walletAppEmbed.showRedeemForm();
       });
       console.log('[Wallet Widget] Redeem button handler attached');
+    } else {
+      console.warn('[Wallet Widget] Redeem button not found in cloned widget');
     }
     
     // Attach increase coins button handler
