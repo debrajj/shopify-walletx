@@ -396,6 +396,9 @@
 
 <script>
 (function() {
+  const WIDGET_VERSION = '2.1.0'; // Version with savings display
+  console.log('[Wallet Widget] Version:', WIDGET_VERSION);
+  
   if (window.walletAppEmbed) return; // Already initialized
   
   const API_BASE = 'https://shopify-walletx.onrender.com/api';
@@ -569,18 +572,33 @@
       const savingsAmount = document.querySelector('#wallet-app-embed-injected #wallet-embed-savings-amount');
       const newTotalEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-new-total');
       
-      if (!coinsInput || !savingsDisplay || !savingsAmount || !newTotalEl) return;
+      console.log('[Wallet Widget] updateSavingsDisplay called', {
+        coinsInput: !!coinsInput,
+        savingsDisplay: !!savingsDisplay,
+        savingsAmount: !!savingsAmount,
+        newTotalEl: !!newTotalEl
+      });
+      
+      if (!coinsInput || !savingsDisplay || !savingsAmount || !newTotalEl) {
+        console.warn('[Wallet Widget] Missing savings display elements');
+        return;
+      }
       
       const coinsToUse = parseInt(coinsInput.value) || 0;
+      
+      console.log('[Wallet Widget] Coins to use:', coinsToUse, 'Balance:', this.currentBalance, 'Cart:', this.cartTotal);
       
       if (coinsToUse > 0 && coinsToUse <= this.currentBalance) {
         const savings = coinsToUse * this.coinValue;
         const newTotal = Math.max(0, this.cartTotal - savings);
         
+        console.log('[Wallet Widget] Showing savings:', savings, 'New total:', newTotal);
+        
         savingsAmount.textContent = '₹' + savings.toFixed(2);
         newTotalEl.textContent = '₹' + newTotal.toFixed(2);
         savingsDisplay.style.display = 'flex';
       } else {
+        console.log('[Wallet Widget] Hiding savings display');
         savingsDisplay.style.display = 'none';
       }
     },
