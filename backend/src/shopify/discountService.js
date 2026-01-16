@@ -418,115 +418,22 @@ async function createShopifyDiscount(shopUrl, email, coinsToRedeem, discountAmou
       };
     }
     
-    // If automatic discount fails, fallback to discount code
-    console.log('[Discount] ⚠️  Automatic discount failed, using discount code...');
-    return await createDiscountCodeFallback(shopUrl, accessToken, email, coinsToRedeem, discountAmount, discountCode);
+    // If we get here, something unexpected happened
+    console.error('[Discount] ❌ Unexpected response from Shopify:', result);
+    return {
+      success: false,
+      error: 'Unexpected response from Shopify',
+      discountCode,
+      discountValue: discountAmount
+    };
     
   } catch (error) {
     console.error('[Discount] ❌ Error:', error);
     
-    // Fallback to discount code
+    // Return error
     return {
-      success: true,
-      discountCode,
-      discountValue: discountAmount,
-      requiresManualSetup: true,
-      message: `Discount code ${discountCode} generated. Create it manually in Shopify admin for ₹${discountAmount} off.`
-    };
-  }
-}
-
-/**
- * Fallback: Create discount code (not automatic)
- */
-async function createDiscountCodeFallback(shopUrl, accessToken, email, coinsToRedeem, discountAmount, discountCode) {
-  console.log('[Discount] 🔄 Creating discount CODE as fallback...');
-  
-  const graphqlQuery = `
-    mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
-      discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
-        codeDiscountNode {
-          id
-          codeDiscount {
-            ... on DiscountCodeBasic {
-              title
-              codes(first: 1) {
-                nodes {
-                  code
-                }
-              }
-            }
-          }
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-  `;
-  
-  const variables = {
-    basicCodeDiscount: {
-      title: `Coin Wallet - ${discountCode}`,
-      code: discountCode,
-      startsAt: new Date().toISOString(),
-      endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      customerSelection: {
-        all: true
-      },
-      customerGets: {
-        value: {
-          discountAmount: {
-            amount: formatDiscountAmount(discountAmount),
-            appliesOnEachItem: false
-          }
-        },
-        items: {
-          all: true
-        }
-      },
-      appliesOncePerCustomer: true,
-      usageLimit: 1,
-      combinesWith: {
-        orderDiscounts: true,
-        productDiscounts: false,
-        shippingDiscounts: false
-      }
-    }
-  };
-  
-  try {
-    const response = await fetch(`https://${shopUrl}/admin/api/2024-01/graphql.json`, {
-      method: 'POST',
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: graphqlQuery,
-        variables: variables
-      })
-    });
-    
-    const result = await response.json();
-    
-    if (result.data?.discountCodeBasicCreate?.codeDiscountNode) {
-      console.log(`[Discount] ✅ Discount code created!`);
-      return {
-        success: true,
-        discountCode,
-        discountValue: discountAmount,
-        message: `Discount code ${discountCode} created! Use at checkout.`
-      };
-    }
-    
-    throw new Error('Failed to create discount code');
-    
-  } catch (error) {
-    console.error('[Discount] ❌ Fallback failed:', error);
-    return {
-      success: true,
+      success: false,
+      error: error.message,
       discountCode,
       discountValue: discountAmount,
       requiresManualSetup: true,
