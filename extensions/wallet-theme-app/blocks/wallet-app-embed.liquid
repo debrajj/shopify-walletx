@@ -396,7 +396,7 @@
 
 <script>
 (function() {
-  const WIDGET_VERSION = '2.2.1'; // Version with Ella theme support
+  const WIDGET_VERSION = '2.3.0'; // Version with instant AJAX cart total update
   console.log('[Wallet Widget] Version:', WIDGET_VERSION);
   
   if (window.walletAppEmbed) return; // Already initialized
@@ -479,14 +479,19 @@
       // Set up coin input listener
       const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
       if (coinsInput) {
-        // Auto-limit input to max coins
+        // Auto-limit input to max coins and update instantly
         coinsInput.addEventListener('input', () => {
           const maxCoins = Math.min(this.currentBalance, Math.floor(this.cartTotal / this.coinValue));
           if (parseInt(coinsInput.value) > maxCoins) {
             coinsInput.value = maxCoins;
           }
           
-          // Update savings display
+          // Update savings display instantly as user types
+          this.updateSavingsDisplay();
+        });
+        
+        // Also update on keyup for immediate feedback
+        coinsInput.addEventListener('keyup', () => {
           this.updateSavingsDisplay();
         });
         
@@ -612,6 +617,7 @@
     updateThemeCartTotal: function(newTotal, savings) {
       // Find common cart total selectors used by Shopify themes
       const totalSelectors = [
+        '.cart-total-grandtotal .cart-total-value', // Ella theme specific
         '.cart-total-value', // Ella theme and similar
         '.cart__footer .totals__total-value',
         '.cart-footer__total',
@@ -634,15 +640,22 @@
             // Save original total
             el.setAttribute('data-original-total', el.textContent);
             
-            // Update with new total
-            const formattedTotal = '₹' + newTotal.toFixed(2);
+            // Update with new total - instant update
+            const formattedTotal = 'Rs. ' + newTotal.toFixed(2);
             el.textContent = formattedTotal;
             
-            // Add visual indicator
+            // Add visual indicator with smooth transition
+            el.style.transition = 'all 0.3s ease';
             el.style.color = '#10b981'; // Green color
             el.style.fontWeight = 'bold';
             
             console.log('[Wallet Widget] Updated cart total:', selector, formattedTotal);
+            updated = true;
+          } else if (el && el.hasAttribute('data-original-total')) {
+            // Already modified, just update the value
+            const formattedTotal = 'Rs. ' + newTotal.toFixed(2);
+            el.textContent = formattedTotal;
+            console.log('[Wallet Widget] Re-updated cart total:', selector, formattedTotal);
             updated = true;
           }
         });
@@ -650,6 +663,7 @@
       
       if (!updated) {
         console.warn('[Wallet Widget] Could not find cart total element to update');
+        console.log('[Wallet Widget] Tried selectors:', totalSelectors);
       }
     },
     
