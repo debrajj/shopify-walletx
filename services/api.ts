@@ -153,7 +153,10 @@ export const api = {
       limit: params.limit.toString()
     });
     
-    return await request<PaginatedResponse<CustomerSummary>>(`/customers/list?${query.toString()}`);
+    console.log('[API] Fetching customers list with params:', params);
+    const response = await request<PaginatedResponse<CustomerSummary>>(`/customers/list?${query.toString()}`);
+    console.log('[API] Customers list response:', response);
+    return response;
   },
 
   getCustomerTransactions: async (customerId: string): Promise<Transaction[]> => {

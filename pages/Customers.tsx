@@ -31,11 +31,15 @@ const Customers: React.FC = () => {
   const loadActiveCustomers = async () => {
     setCustomersLoading(true);
     try {
+      console.log('[Customers List] Loading customers, page:', currentPage);
       const response = await api.getCustomersList({ page: currentPage, limit: 20 });
-      setActiveCustomers(response.data);
-      setTotalPages(response.meta.last_page);
+      console.log('[Customers List] Response:', response);
+      setActiveCustomers(response.data || []);
+      setTotalPages(response.meta?.last_page || 1);
+      console.log('[Customers List] Loaded', response.data?.length || 0, 'customers');
     } catch (err) {
       console.error('[Customers List] Error:', err);
+      setActiveCustomers([]);
     } finally {
       setCustomersLoading(false);
     }
