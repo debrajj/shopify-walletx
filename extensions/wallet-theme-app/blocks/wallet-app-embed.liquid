@@ -421,6 +421,8 @@
     currentBalance: 0,
     cartTotal: 0,
     coinValue: 1, // 1 coin = ₹1 (changed from 0.01)
+    isCheckingBalance: false, // Flag to prevent duplicate checks
+    hasAutoChecked: false, // Flag to prevent multiple auto-checks
     
     // Load saved email from localStorage or logged-in customer
     init: function() {
@@ -747,29 +749,37 @@
     },
     
     checkBalance: async function() {
-      // Try to find email input in both original and injected widget
-      let emailEl = document.getElementById('wallet-embed-email');
-      if (!emailEl) {
-        emailEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
-      }
-      if (!emailEl) {
-        console.error('[Wallet Widget] Email input not found');
+      // Prevent duplicate calls
+      if (this.isCheckingBalance) {
+        console.log('[Wallet Widget] Already checking balance, skipping duplicate call');
         return;
       }
       
-      const email = emailEl.value.trim();
-      if (!email) {
-        this.showMessage('Please enter your email', 'error');
-        return;
-      }
-
-      // Basic email validation
-      if (!email.includes('@')) {
-        this.showMessage('Please enter a valid email', 'error');
-        return;
-      }
-
+      this.isCheckingBalance = true;
+      
       try {
+        // Try to find email input in both original and injected widget
+        let emailEl = document.getElementById('wallet-embed-email');
+        if (!emailEl) {
+          emailEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+        }
+        if (!emailEl) {
+          console.error('[Wallet Widget] Email input not found');
+          return;
+        }
+        
+        const email = emailEl.value.trim();
+        if (!email) {
+          this.showMessage('Please enter your email', 'error');
+          return;
+        }
+
+        // Basic email validation
+        if (!email.includes('@')) {
+          this.showMessage('Please enter a valid email', 'error');
+          return;
+        }
+
         const response = await fetch(
           API_BASE + '/wallet/balance?email=' + encodeURIComponent(email),
           {
@@ -804,6 +814,11 @@
       } catch (err) {
         console.error('[Wallet Widget] Error:', err);
         this.showMessage('Network error', 'error');
+      } finally {
+        // Reset flag after a short delay to allow legitimate subsequent calls
+        setTimeout(() => {
+          this.isCheckingBalance = false;
+        }, 1000);
       }
     },
     
@@ -1203,9 +1218,18 @@
   
   // Auto-check balance for logged-in customers
   function autoCheckBalance() {
+    // Prevent multiple auto-checks
+    if (walletAppEmbed.hasAutoChecked) {
+      console.log('[Wallet Widget] Already auto-checked, skipping');
+      return;
+    }
+    
     {% if customer %}
       const customerEmail = {{ customer.email | json }};
       console.log('[Wallet Widget] Auto-checking balance for logged-in customer:', customerEmail);
+      
+      // Mark as checked
+      walletAppEmbed.hasAutoChecked = true;
       
       // Try multiple times with increasing delays to ensure widget is injected
       let attempts = 0;
@@ -1227,6 +1251,8 @@
           setTimeout(tryAutoCheck, 300);
         } else {
           console.log('[Wallet Widget] Failed to find widget after', maxAttempts, 'attempts');
+          // Reset flag if we failed, so it can try again later
+          walletAppEmbed.hasAutoChecked = false;
         }
       }
       
