@@ -151,7 +151,7 @@ export const api = {
     return await request<Transaction[]>(`/customers/${customerId}/transactions`);
   },
 
-  addCoins: async (data: { phone: string; coins: number; description?: string }): Promise<{ success: boolean; newBalance: number }> => {
+  addCoins: async (data: { phone?: string; email?: string; coins: number; description?: string }): Promise<{ success: boolean; newBalance: number }> => {
     return await request('/wallet/credit', {
       method: 'POST',
       body: JSON.stringify(data)
