@@ -71,6 +71,7 @@ export interface CustomerSummary {
   total_orders: number;
   total_spent: number;
   total_coins_used: number;
+  last_activity?: string;
 }
 
 export interface AutomationJob {

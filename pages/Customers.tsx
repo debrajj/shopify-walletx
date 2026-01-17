@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, ShoppingBag, Coins, CreditCard, User, Phone, Plus, X, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, ShoppingBag, Coins, CreditCard, User, Phone, Plus, X, CheckCircle2, Clock } from 'lucide-react';
 import { api } from '../services/api';
 import { CustomerSummary, Transaction } from '../types';
 import TransactionTable from '../components/TransactionTable';
@@ -12,10 +12,57 @@ const Customers: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Active customers list
+  const [activeCustomers, setActiveCustomers] = useState<CustomerSummary[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
   // Add Coins Modal
   const [showAddCoinsModal, setShowAddCoinsModal] = useState(false);
   const [addCoinsForm, setAddCoinsForm] = useState({ coins: '', description: '' });
   const [addCoinsStatus, setAddCoinsStatus] = useState<'IDLE' | 'SUBMITTING' | 'SUCCESS'>('IDLE');
+
+  // Load active customers on mount
+  useEffect(() => {
+    loadActiveCustomers();
+  }, [currentPage]);
+
+  const loadActiveCustomers = async () => {
+    setCustomersLoading(true);
+    try {
+      const response = await api.getCustomersList({ page: currentPage, limit: 20 });
+      setActiveCustomers(response.data);
+      setTotalPages(response.meta.last_page);
+    } catch (err) {
+      console.error('[Customers List] Error:', err);
+    } finally {
+      setCustomersLoading(false);
+    }
+  };
+
+  const handleCustomerClick = async (cust: CustomerSummary) => {
+    setLoading(true);
+    setCustomer(null);
+    setTransactions([]);
+    setHasSearched(true);
+    setSearchTerm(cust.phone || cust.email || cust.name);
+
+    try {
+      // Set customer data
+      setCustomer(cust);
+
+      // Fetch transactions
+      if (cust.id) {
+        const txData = await api.getCustomerTransactions(cust.id);
+        setTransactions(txData);
+      }
+    } catch (err) {
+      console.error('[Customer Click] Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -77,6 +124,8 @@ const Customers: React.FC = () => {
         setShowAddCoinsModal(false);
         setAddCoinsStatus('IDLE');
         setAddCoinsForm({ coins: '', description: '' });
+        // Refresh the active customers list
+        loadActiveCustomers();
       }, 1500);
 
     } catch (err) {
@@ -188,6 +237,99 @@ const Customers: React.FC = () => {
           <p className="text-slate-500">We couldn't find any wallet associated with that search term.</p>
         </div>
       )}
+
+      {/* Active Customers List */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900">Active Customers</h2>
+          <p className="text-sm text-slate-500">Most recent activity first</p>
+        </div>
+
+        {customersLoading ? (
+          <div className="flex justify-center py-12 bg-white rounded-xl border border-slate-200">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600"></div>
+          </div>
+        ) : activeCustomers.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
+            <User className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-slate-900">No Customers Yet</h3>
+            <p className="text-slate-500">Active customers will appear here once they create wallets.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeCustomers.map((cust) => (
+                <div
+                  key={cust.id}
+                  onClick={() => handleCustomerClick(cust)}
+                  className="bg-white rounded-xl border border-slate-200 p-4 hover:border-emerald-500 hover:shadow-md transition-all cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 group-hover:bg-emerald-200 transition-colors">
+                        <User className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                          {cust.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {cust.phone || cust.email}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Balance:</span>
+                      <span className="font-bold text-emerald-700">{cust.balance} Coins</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Orders:</span>
+                      <span className="font-medium text-slate-900">{cust.total_orders}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Coins Used:</span>
+                      <span className="font-medium text-slate-900">{cust.total_coins_used}</span>
+                    </div>
+                    {cust.last_activity && (
+                      <div className="flex items-center gap-1 text-xs text-slate-400 pt-2 border-t border-slate-100">
+                        <Clock className="h-3 w-3" />
+                        <span>Last active: {new Date(cust.last_activity).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Add Coins Modal */}
       {showAddCoinsModal && customer && (

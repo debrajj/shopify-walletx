@@ -1038,6 +1038,54 @@ app.get('/api/customers/:id/transactions', requireAdminAuth, async (req, res) =>
   }
 });
 
+// Get Active Customers List (Admin)
+app.get('/api/customers/list', requireAdminAuth, async (req, res) => {
+  try {
+    const shopUrl = req.shopUrl;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    // Get customers with their most recent activity
+    const result = await db.query(`
+      SELECT 
+        w.id::text,
+        w.customer_name as name,
+        w.customer_phone as phone,
+        w.customer_email as email,
+        w.balance,
+        w.updated_at as last_activity,
+        COUNT(t.id) as total_orders,
+        COALESCE(SUM(CASE WHEN t.type = 'DEBIT' THEN t.coins ELSE 0 END), 0) as total_coins_used
+      FROM wallets w
+      LEFT JOIN transactions t ON w.id = t.wallet_id
+      WHERE w.store_url = $1
+      GROUP BY w.id, w.customer_name, w.customer_phone, w.customer_email, w.balance, w.updated_at
+      ORDER BY w.updated_at DESC
+      LIMIT $2 OFFSET $3
+    `, [shopUrl, limit, offset]);
+
+    // Get total count
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM wallets WHERE store_url = $1',
+      [shopUrl]
+    );
+
+    res.json({
+      data: result.rows,
+      meta: {
+        current_page: page,
+        last_page: Math.ceil(parseInt(countResult.rows[0]?.count || 0) / limit),
+        total: parseInt(countResult.rows[0]?.count || 0),
+        per_page: limit
+      }
+    });
+  } catch (err) {
+    console.error('Get customers list error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // --- AUTOMATION ENDPOINTS ---
 
 app.get('/api/automations', requireAdminAuth, async (req, res) => {

@@ -147,6 +147,15 @@ export const api = {
     return await request<CustomerSummary | null>(`/customers/search?q=${encodeURIComponent(query)}`);
   },
 
+  getCustomersList: async (params: { page: number; limit: number } = { page: 1, limit: 20 }): Promise<PaginatedResponse<CustomerSummary>> => {
+    const query = new URLSearchParams({
+      page: params.page.toString(),
+      limit: params.limit.toString()
+    });
+    
+    return await request<PaginatedResponse<CustomerSummary>>(`/customers/list?${query.toString()}`);
+  },
+
   getCustomerTransactions: async (customerId: string): Promise<Transaction[]> => {
     return await request<Transaction[]>(`/customers/${customerId}/transactions`);
   },
