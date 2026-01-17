@@ -58,7 +58,8 @@ const Customers: React.FC = () => {
     setAddCoinsStatus('SUBMITTING');
     try {
       await api.addCoins({
-        phone: customer.phone || customer.email || '',
+        phone: customer.phone || '',
+        email: customer.email || '',
         coins: parseFloat(addCoinsForm.coins),
         description: addCoinsForm.description || 'Manual addition via Customer Profile'
       });

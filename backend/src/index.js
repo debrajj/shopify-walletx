@@ -612,34 +612,54 @@ app.post('/api/shopify/create-discount', requireStorefrontAuth, async (req, res)
 // 6. Credit Coins (Admin Only)
 app.post('/api/wallet/credit', requireAdminAuth, async (req, res) => {
   try {
-    const { phone, coins, description } = req.body;
+    const { phone, email, coins, description } = req.body;
     const shopUrl = req.shopUrl;
     const amount = parseFloat(coins);
 
-    if (!phone || isNaN(amount)) {
-      return res.status(400).json({ success: false, message: 'Invalid input' });
+    // Support both phone and email
+    const identifier = phone || email;
+    const identifierType = email && !phone ? 'email' : 'phone';
+
+    if (!identifier || isNaN(amount)) {
+      return res.status(400).json({ success: false, message: 'Invalid input - email or phone required' });
     }
 
-    // Check if wallet exists
-    const walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [phone, shopUrl]);
+    // Check if wallet exists by email or phone
+    let walletRes;
+    if (identifierType === 'email') {
+      walletRes = await db.query('SELECT * FROM wallets WHERE customer_email = $1 AND store_url = $2', [identifier, shopUrl]);
+    } else {
+      walletRes = await db.query('SELECT * FROM wallets WHERE customer_phone = $1 AND store_url = $2', [identifier, shopUrl]);
+    }
+    
     let walletId;
     let currentBalance = 0;
 
     if (walletRes.rows.length === 0) {
       // Create new wallet
-      const newWallet = await db.query(`
-        INSERT INTO wallets (store_url, phone_hash, customer_name, customer_phone, balance)
-        VALUES ($1, $2, 'Guest', $2, $3)
-        RETURNING id, balance
-      `, [shopUrl, phone, amount]); // phone used as hash for demo
-      walletId = newWallet.rows[0].id;
-      currentBalance = parseFloat(newWallet.rows[0].balance);
+      if (identifierType === 'email') {
+        const newWallet = await db.query(`
+          INSERT INTO wallets (store_url, phone_hash, customer_name, customer_email, balance)
+          VALUES ($1, $2, 'Guest', $3, $4)
+          RETURNING id, balance
+        `, [shopUrl, identifier, identifier, amount]);
+        walletId = newWallet.rows[0].id;
+        currentBalance = parseFloat(newWallet.rows[0].balance);
+      } else {
+        const newWallet = await db.query(`
+          INSERT INTO wallets (store_url, phone_hash, customer_name, customer_phone, balance)
+          VALUES ($1, $2, 'Guest', $3, $4)
+          RETURNING id, balance
+        `, [shopUrl, identifier, identifier, amount]);
+        walletId = newWallet.rows[0].id;
+        currentBalance = parseFloat(newWallet.rows[0].balance);
+      }
     } else {
       // Update existing
       const w = walletRes.rows[0];
       walletId = w.id;
       currentBalance = parseFloat(w.balance) + amount;
-      await db.query('UPDATE wallets SET balance = $1 WHERE id = $2', [currentBalance, walletId]);
+      await db.query('UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2', [currentBalance, walletId]);
     }
 
     // Log Transaction
@@ -653,7 +673,7 @@ app.post('/api/wallet/credit', requireAdminAuth, async (req, res) => {
       newBalance: currentBalance
     });
   } catch (err) {
-    console.error(err);
+    console.error('[API] Credit coins error:', err);
     res.status(500).json({ success: false, error: 'Server error' });
   }
 });
