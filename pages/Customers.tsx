@@ -261,52 +261,72 @@ const Customers: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeCustomers.map((cust) => (
-                <div
-                  key={cust.id}
-                  onClick={() => handleCustomerClick(cust)}
-                  className="bg-white rounded-xl border border-slate-200 p-4 hover:border-emerald-500 hover:shadow-md transition-all cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 group-hover:bg-emerald-200 transition-colors">
-                        <User className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">
-                          {cust.name}
-                        </h3>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Customer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Balance
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Orders
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Coins Used
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Last Activity
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {activeCustomers.map((cust) => (
+                    <tr
+                      key={cust.id}
+                      onClick={() => handleCustomerClick(cust)}
+                      className="hover:bg-emerald-50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 flex-shrink-0">
+                            <User className="h-5 w-5" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-slate-900">{cust.name}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-slate-500">
+                          <Phone className="h-4 w-4 mr-1" />
                           {cust.phone || cust.email}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Balance:</span>
-                      <span className="font-bold text-emerald-700">{cust.balance} Coins</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Orders:</span>
-                      <span className="font-medium text-slate-900">{cust.total_orders}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Coins Used:</span>
-                      <span className="font-medium text-slate-900">{cust.total_coins_used}</span>
-                    </div>
-                    {cust.last_activity && (
-                      <div className="flex items-center gap-1 text-xs text-slate-400 pt-2 border-t border-slate-100">
-                        <Clock className="h-3 w-3" />
-                        <span>Last active: {new Date(cust.last_activity).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-bold text-emerald-700">{cust.balance} Coins</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                        {cust.total_orders}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                        {cust.total_coins_used}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-xs text-slate-400">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {cust.last_activity ? new Date(cust.last_activity).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             {/* Pagination */}
