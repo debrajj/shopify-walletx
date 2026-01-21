@@ -14,9 +14,8 @@
 {% endschema %}
 
 {% if block.settings.enabled %}
-{% if customer %}
 <!-- Wallet Widget v4.3 - Updated with increment/decrement buttons -->
-<div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}" data-customer-email="{{ customer.email }}" data-customer-phone="{{ customer.phone }}">
+<div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}" data-customer-email="{% if customer %}{{ customer.email }}{% endif %}" data-customer-phone="{% if customer %}{{ customer.phone }}{% endif %}">
   <div class="wallet-embed-container">
     <button class="wallet-close-button" onclick="walletAppEmbed.hideWidget()" title="Close">×</button>
     <div class="wallet-embed-header">
@@ -75,8 +74,6 @@
     <div id="wallet-embed-message" class="wallet-embed-message"></div>
   </div>
 </div>
-{% else %}
-<!-- Wallet widget hidden: Customer not logged in -->
 {% endif %}
 
 <style>
