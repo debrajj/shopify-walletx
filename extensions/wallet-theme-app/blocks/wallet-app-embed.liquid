@@ -419,12 +419,7 @@
     display: block;
   }
 
-  /* Hide the original embed element */
-  .wallet-app-embed {
-    display: none !important;
-  }
-  
-  /* Always show the injected clone */
+  /* Show the widget in cart */
   #wallet-app-embed-injected {
     display: block !important;
     visibility: visible !important;
@@ -1284,3 +1279,4 @@
   console.log('[Wallet Widget] Initialized and watching for cart');
 })();
 </script>
+{% endif %}
