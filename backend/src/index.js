@@ -1093,6 +1093,8 @@ app.get('/api/customers/list', requireAdminAuth, async (req, res) => {
   } catch (err) {
     console.error('Get customers list error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // --- AUTOMATION ENDPOINTS ---
 
