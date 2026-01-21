@@ -1,6 +1,7 @@
 {% if customer %}
 <div id="wallet-cart-widget" class="wallet-cart-widget" data-shop="{{ shop.permanent_domain }}" data-customer-email="{{ customer.email }}" data-customer-phone="{{ customer.phone }}">
   <div class="wallet-cart-container">
+    <button class="wallet-close-button" onclick="walletCartWidget.hideWidget()" title="Close">×</button>
     <div id="wallet-cart-display" class="wallet-cart-display" style="display: none;">
       <div class="wallet-balance-section">
         <div class="wallet-balance-label">Your balance</div>
@@ -57,6 +58,34 @@
     background: #f5f5f5;
     border-radius: 12px;
     padding: 20px;
+    position: relative;
+  }
+
+  .wallet-close-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: #fff;
+    color: #666;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .wallet-close-button:hover {
+    background: #f44336;
+    color: white;
+    border-color: #f44336;
   }
 
   .wallet-cart-display {
@@ -341,6 +370,10 @@
       setTimeout(() => {
         window.location.href = '/discount/' + discountCode + '?redirect=/checkout';
       }, 800);
+    },
+    
+    hideWidget: function() {
+      document.getElementById('wallet-cart-widget').style.display = 'none';
     }
   };
 
