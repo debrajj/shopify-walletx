@@ -14,12 +14,14 @@
 {% endschema %}
 
 {% if block.settings.enabled %}
+{% if customer %}
 <!-- Wallet Widget v4.3 - Updated with increment/decrement buttons -->
-<div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}">
+<div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}" data-customer-email="{{ customer.email }}" data-customer-phone="{{ customer.phone }}">
   <div class="wallet-embed-container">
+    <button class="wallet-close-button" onclick="walletAppEmbed.hideWidget()" title="Close">×</button>
     <div class="wallet-embed-header">
       <svg class="wallet-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <path d="M17 6V5C17 3.89543 16.1046 3 15 3H5C3.89543 3 3 3.89543 3 5V15C3 16.1046 3.89543 17 5 17H15C16.1046 17 17 16.1046 17 15V14M17 6H7C5.89543 6 5 6.89543 5 8V12C5 13.1046 5.89543 14 7 14H17M17 6V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M17 6V5C17 3.89543 16.1046 3 15 3H5C3.89543 3 3 5V15C3 16.1046 3.89543 17 5 17H15C16.1046 17 17 16.1046 17 15V14M17 6H7C5.89543 6 5 6.89543 5 8V12C5 13.1046 5.89543 14 7 14H17M17 6V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         <circle cx="13" cy="10" r="1" fill="currentColor"/>
       </svg>
       <span class="wallet-embed-title">Wallet</span>
@@ -73,6 +75,10 @@
     <div id="wallet-embed-message" class="wallet-embed-message"></div>
   </div>
 </div>
+{% else %}
+<!-- Wallet widget hidden: Customer not logged in -->
+{% endif %}
+{% endif %}
 
 <style>
   .wallet-app-embed {
@@ -86,6 +92,34 @@
     border: 1px solid #e3e3e3;
     border-radius: 8px;
     padding: 16px;
+    position: relative;
+  }
+
+  .wallet-close-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: #fff;
+    color: #666;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .wallet-close-button:hover {
+    background: #f44336;
+    color: white;
+    border-color: #f44336;
   }
 
   .wallet-embed-header {
@@ -415,9 +449,11 @@
   if (!embedEl) return;
   
   const shop = embedEl.dataset.shop;
+  const customerEmail = embedEl.dataset.customerEmail;
+  const customerPhone = embedEl.dataset.customerPhone;
   
   window.walletAppEmbed = {
-    currentEmail: '',
+    currentEmail: customerEmail || '',
     currentBalance: 0,
     cartTotal: 0,
     coinValue: 1, // 1 coin = ₹1 (changed from 0.01)
@@ -426,44 +462,21 @@
     
     // Load saved email from localStorage or logged-in customer
     init: function() {
-      // Check if customer is logged in (Shopify provides this)
-      {% if customer %}
-      const loggedInEmail = {{ customer.email | json }};
-      if (loggedInEmail) {
-        console.log('[Wallet Widget] Customer logged in:', loggedInEmail);
-        this.currentEmail = loggedInEmail;
-        
-        // Save to localStorage
-        localStorage.setItem('walletEmail', loggedInEmail);
-        
-        // Load balance from server
+      // Auto-load balance if customer is logged in
+      if (this.currentEmail) {
+        console.log('[Wallet Widget] Customer logged in:', this.currentEmail);
         setTimeout(() => {
-          const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
-          if (emailInput) {
-            emailInput.value = loggedInEmail;
-          }
           this.checkBalance();
         }, 500);
-        return;
       }
-      {% endif %}
-      
-      // Fallback: check localStorage for saved session
-      const savedEmail = localStorage.getItem('walletEmail');
-      const savedBalance = localStorage.getItem('walletBalance');
-      
-      if (savedEmail && savedBalance) {
-        console.log('[Wallet Widget] Found saved session:', savedEmail);
-        this.currentEmail = savedEmail;
-        this.currentBalance = parseInt(savedBalance) || 0;
-        
-        // Pre-fill and show balance section
-        setTimeout(() => {
-          const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
-          if (emailInput) {
-            emailInput.value = savedEmail;
-          }
-          
+    },
+    
+    hideWidget: function() {
+      const widget = document.getElementById('wallet-app-embed');
+      if (widget) {
+        widget.style.display = 'none';
+      }
+    },
           // Show balance immediately with saved data
           this.displayBalance(this.currentBalance);
           
