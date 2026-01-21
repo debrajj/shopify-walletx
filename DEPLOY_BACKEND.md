@@ -24,7 +24,7 @@ git push origin main
 Connect to Render Postgres and run:
 ```sql
 -- Add email column
-ALTER TABLE wallets ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255);
+ALTER TABLE wallets ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255); 
 
 -- Create index
 CREATE INDEX IF NOT EXISTS idx_wallets_email ON wallets(customer_email, store_url);

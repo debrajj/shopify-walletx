@@ -1053,10 +1053,11 @@ app.get('/api/customers/list', requireAdminAuth, async (req, res) => {
         w.customer_name as name,
         w.customer_phone as phone,
         w.customer_email as email,
-        w.balance,
+        w.balance::numeric as balance,
         w.updated_at as last_activity,
-        COUNT(t.id) as total_orders,
-        COALESCE(SUM(CASE WHEN t.type = 'DEBIT' THEN t.coins ELSE 0 END), 0) as total_coins_used
+        COUNT(t.id)::integer as total_orders,
+        COALESCE(SUM(CASE WHEN t.type = 'DEBIT' THEN t.coins ELSE 0 END), 0)::numeric as total_coins_used,
+        0::numeric as total_spent
       FROM wallets w
       LEFT JOIN transactions t ON w.id = t.wallet_id
       WHERE w.store_url = $1
@@ -1071,8 +1072,17 @@ app.get('/api/customers/list', requireAdminAuth, async (req, res) => {
       [shopUrl]
     );
 
+    // Convert numeric strings to numbers for JSON response
+    const customers = result.rows.map(row => ({
+      ...row,
+      balance: parseFloat(row.balance),
+      total_orders: parseInt(row.total_orders),
+      total_coins_used: parseFloat(row.total_coins_used),
+      total_spent: parseFloat(row.total_spent)
+    }));
+
     res.json({
-      data: result.rows,
+      data: customers,
       meta: {
         current_page: page,
         last_page: Math.ceil(parseInt(countResult.rows[0]?.count || 0) / limit),
@@ -1082,9 +1092,7 @@ app.get('/api/customers/list', requireAdminAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('Get customers list error:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+    res.status(500).json({ error: 'Serv
 
 // --- AUTOMATION ENDPOINTS ---
 
