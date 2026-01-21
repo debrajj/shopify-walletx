@@ -1,18 +1,14 @@
-<div id="wallet-cart-widget" class="wallet-cart-widget" data-shop="{{ shop.permanent_domain }}">
+{% if customer %}
+<div id="wallet-cart-widget" class="wallet-cart-widget" data-shop="{{ shop.permanent_domain }}" data-customer-email="{{ customer.email }}" data-customer-phone="{{ customer.phone }}">
   <div class="wallet-cart-container">
     <div id="wallet-cart-display" class="wallet-cart-display" style="display: none;">
       <div class="wallet-balance-section">
         <div class="wallet-balance-label">Your balance</div>
-        <div class="wallet-balance-amount" id="wallet-balance-display">815 points</div>
+        <div class="wallet-balance-amount" id="wallet-balance-display">0 points</div>
       </div>
-      <div class="wallet-cart-actions">
-        <button class="wallet-redeem-button" onclick="walletCartWidget.showRedeemForm()">
-          Redeem points
-        </button>
-        <button class="wallet-logout-button-small" onclick="walletCartWidget.logout()" title="Logout">
-          ✕
-        </button>
-      </div>
+      <button class="wallet-redeem-button" onclick="walletCartWidget.showRedeemForm()">
+        Redeem points
+      </button>
     </div>
     
     <div id="wallet-cart-redeem" class="wallet-cart-redeem" style="display: none;">
@@ -46,6 +42,9 @@
     <div id="wallet-cart-message" class="wallet-cart-message"></div>
   </div>
 </div>
+{% else %}
+<!-- Wallet widget hidden: Customer not logged in -->
+{% endif %}
 
 <style>
   .wallet-cart-widget {
@@ -65,12 +64,6 @@
     justify-content: space-between;
     align-items: center;
     gap: 16px;
-  }
-
-  .wallet-cart-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
   }
 
   .wallet-balance-section {
@@ -107,27 +100,6 @@
   .wallet-redeem-button:hover {
     background: #fafafa;
     border-color: #ccc;
-  }
-
-  .wallet-logout-button-small {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: #f44336;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .wallet-logout-button-small:hover {
-    background: #d32f2f;
   }
 
   .wallet-cart-redeem {
@@ -241,10 +213,55 @@
   if (!widgetEl) return;
   
   const shop = widgetEl.dataset.shop;
+  const customerEmail = widgetEl.dataset.customerEmail;
+  const customerPhone = widgetEl.dataset.customerPhone;
   
   window.walletCartWidget = {
-    currentPhone: '',
+    currentPhone: customerPhone || '',
+    currentEmail: customerEmail || '',
     currentBalance: 0,
+    
+    init: function() {
+      // Auto-load balance if customer is logged in
+      if (this.currentEmail || this.currentPhone) {
+        this.loadBalance();
+      }
+    },
+    
+    loadBalance: async function() {
+      try {
+        const identifier = this.currentEmail || this.currentPhone;
+        const response = await fetch(
+          API_BASE + '/wallet/balance?phone=' + encodeURIComponent(identifier),
+          {
+            headers: {
+              'x-shop-url': shop,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.currentBalance = data.walletCoins || 0;
+          
+          document.getElementById('wallet-balance-display').textContent = this.currentBalance + ' points';
+          
+          if (this.currentBalance > 0) {
+            document.getElementById('wallet-cart-display').style.display = 'flex';
+            document.getElementById('wallet-cart-login').style.display = 'none';
+            document.getElementById('wallet-coins-input').max = this.currentBalance;
+          } else {
+            // Hide widget if no balance
+            document.getElementById('wallet-cart-widget').style.display = 'none';
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load wallet balance:', err);
+        // Hide widget on error
+        document.getElementById('wallet-cart-widget').style.display = 'none';
+      }
+    },
     
     showMessage: function(text, type) {
       const msgEl = document.getElementById('wallet-cart-message');
@@ -324,28 +341,15 @@
       setTimeout(() => {
         window.location.href = '/discount/' + discountCode + '?redirect=/checkout';
       }, 800);
-    },
-
-    logout: function() {
-      // Clear current session
-      this.currentPhone = '';
-      this.currentBalance = 0;
-      
-      // Reset form
-      document.getElementById('wallet-phone').value = '';
-      document.getElementById('wallet-coins-input').value = '';
-      
-      // Hide wallet display and redeem form, show login
-      document.getElementById('wallet-cart-display').style.display = 'none';
-      document.getElementById('wallet-cart-redeem').style.display = 'none';
-      document.getElementById('wallet-cart-login').style.display = 'block';
-      
-      // Clear balance display
-      document.getElementById('wallet-balance-display').textContent = '0 points';
-      
-      this.showMessage('Logged out successfully', 'success');
     }
   };
+
+  // Initialize on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => walletCartWidget.init());
+  } else {
+    walletCartWidget.init();
+  }
 
   // Add Enter key support for input
   document.addEventListener('DOMContentLoaded', function() {
