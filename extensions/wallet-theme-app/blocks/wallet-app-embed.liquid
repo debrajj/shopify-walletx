@@ -15,12 +15,11 @@
 
 {% if block.settings.enabled %}
 <!-- Wallet Widget v4.3 - Updated with increment/decrement buttons -->
-<div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}" data-customer-email="{% if customer %}{{ customer.email }}{% endif %}" data-customer-phone="{% if customer %}{{ customer.phone }}{% endif %}">
+<div id="wallet-app-embed" class="wallet-app-embed" data-shop="{{ shop.permanent_domain }}">
   <div class="wallet-embed-container">
-    <button class="wallet-close-button" onclick="walletAppEmbed.hideWidget()" title="Close">×</button>
     <div class="wallet-embed-header">
       <svg class="wallet-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <path d="M17 6V5C17 3.89543 16.1046 3 15 3H5C3.89543 3 3 5V15C3 16.1046 3.89543 17 5 17H15C16.1046 17 17 16.1046 17 15V14M17 6H7C5.89543 6 5 6.89543 5 8V12C5 13.1046 5.89543 14 7 14H17M17 6V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M17 6V5C17 3.89543 16.1046 3 15 3H5C3.89543 3 3 3.89543 3 5V15C3 16.1046 3.89543 17 5 17H15C16.1046 17 17 16.1046 17 15V14M17 6H7C5.89543 6 5 6.89543 5 8V12C5 13.1046 5.89543 14 7 14H17M17 6V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         <circle cx="13" cy="10" r="1" fill="currentColor"/>
       </svg>
       <span class="wallet-embed-title">Wallet</span>
@@ -74,7 +73,6 @@
     <div id="wallet-embed-message" class="wallet-embed-message"></div>
   </div>
 </div>
-{% endif %}
 
 <style>
   .wallet-app-embed {
@@ -88,34 +86,6 @@
     border: 1px solid #e3e3e3;
     border-radius: 8px;
     padding: 16px;
-    position: relative;
-  }
-
-  .wallet-close-button {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    background: #fff;
-    color: #666;
-    border: 1px solid #ddd;
-    border-radius: 50%;
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-  }
-
-  .wallet-close-button:hover {
-    background: #f44336;
-    color: white;
-    border-color: #f44336;
   }
 
   .wallet-embed-header {
@@ -155,14 +125,12 @@
     font-size: 14px;
     color: #999;
     margin-bottom: 4px;
-    display: block;
   }
 
   .wallet-balance-amount {
     font-size: 28px;
     font-weight: 700;
     color: #333;
-    display: block;
   }
 
   .wallet-redeem-button {
@@ -419,7 +387,12 @@
     display: block;
   }
 
-  /* Show the widget in cart */
+  /* Hide the original embed element */
+  .wallet-app-embed {
+    display: none !important;
+  }
+  
+  /* Always show the injected clone */
   #wallet-app-embed-injected {
     display: block !important;
     visibility: visible !important;
@@ -440,34 +413,53 @@
   if (!embedEl) return;
   
   const shop = embedEl.dataset.shop;
-  const customerEmail = embedEl.dataset.customerEmail;
-  const customerPhone = embedEl.dataset.customerPhone;
   
   window.walletAppEmbed = {
-    currentEmail: customerEmail || '',
+    currentEmail: '',
     currentBalance: 0,
     cartTotal: 0,
     coinValue: 1, // 1 coin = ₹1 (changed from 0.01)
-    isCheckingBalance: false, // Flag to prevent duplicate checks
-    hasAutoChecked: false, // Flag to prevent multiple auto-checks
     
     // Load saved email from localStorage or logged-in customer
     init: function() {
-      // Auto-load balance if customer is logged in
-      if (this.currentEmail) {
-        console.log('[Wallet Widget] Customer logged in:', this.currentEmail);
+      // Check if customer is logged in (Shopify provides this)
+      {% if customer %}
+      const loggedInEmail = {{ customer.email | json }};
+      if (loggedInEmail) {
+        console.log('[Wallet Widget] Customer logged in:', loggedInEmail);
+        this.currentEmail = loggedInEmail;
+        
+        // Save to localStorage
+        localStorage.setItem('walletEmail', loggedInEmail);
+        
+        // Load balance from server
         setTimeout(() => {
+          const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+          if (emailInput) {
+            emailInput.value = loggedInEmail;
+          }
           this.checkBalance();
         }, 500);
+        return;
       }
-    },
-    
-    hideWidget: function() {
-      const widget = document.getElementById('wallet-app-embed');
-      if (widget) {
-        widget.style.display = 'none';
-      }
-    },
+      {% endif %}
+      
+      // Fallback: check localStorage for saved session
+      const savedEmail = localStorage.getItem('walletEmail');
+      const savedBalance = localStorage.getItem('walletBalance');
+      
+      if (savedEmail && savedBalance) {
+        console.log('[Wallet Widget] Found saved session:', savedEmail);
+        this.currentEmail = savedEmail;
+        this.currentBalance = parseInt(savedBalance) || 0;
+        
+        // Pre-fill and show balance section
+        setTimeout(() => {
+          const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+          if (emailInput) {
+            emailInput.value = savedEmail;
+          }
+          
           // Show balance immediately with saved data
           this.displayBalance(this.currentBalance);
           
@@ -753,37 +745,29 @@
     },
     
     checkBalance: async function() {
-      // Prevent duplicate calls
-      if (this.isCheckingBalance) {
-        console.log('[Wallet Widget] Already checking balance, skipping duplicate call');
+      // Try to find email input in both original and injected widget
+      let emailEl = document.getElementById('wallet-embed-email');
+      if (!emailEl) {
+        emailEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
+      }
+      if (!emailEl) {
+        console.error('[Wallet Widget] Email input not found');
         return;
       }
       
-      this.isCheckingBalance = true;
-      
+      const email = emailEl.value.trim();
+      if (!email) {
+        this.showMessage('Please enter your email', 'error');
+        return;
+      }
+
+      // Basic email validation
+      if (!email.includes('@')) {
+        this.showMessage('Please enter a valid email', 'error');
+        return;
+      }
+
       try {
-        // Try to find email input in both original and injected widget
-        let emailEl = document.getElementById('wallet-embed-email');
-        if (!emailEl) {
-          emailEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
-        }
-        if (!emailEl) {
-          console.error('[Wallet Widget] Email input not found');
-          return;
-        }
-        
-        const email = emailEl.value.trim();
-        if (!email) {
-          this.showMessage('Please enter your email', 'error');
-          return;
-        }
-
-        // Basic email validation
-        if (!email.includes('@')) {
-          this.showMessage('Please enter a valid email', 'error');
-          return;
-        }
-
         const response = await fetch(
           API_BASE + '/wallet/balance?email=' + encodeURIComponent(email),
           {
@@ -818,11 +802,6 @@
       } catch (err) {
         console.error('[Wallet Widget] Error:', err);
         this.showMessage('Network error', 'error');
-      } finally {
-        // Reset flag after a short delay to allow legitimate subsequent calls
-        setTimeout(() => {
-          this.isCheckingBalance = false;
-        }, 1000);
       }
     },
     
@@ -1222,18 +1201,9 @@
   
   // Auto-check balance for logged-in customers
   function autoCheckBalance() {
-    // Prevent multiple auto-checks
-    if (walletAppEmbed.hasAutoChecked) {
-      console.log('[Wallet Widget] Already auto-checked, skipping');
-      return;
-    }
-    
     {% if customer %}
       const customerEmail = {{ customer.email | json }};
       console.log('[Wallet Widget] Auto-checking balance for logged-in customer:', customerEmail);
-      
-      // Mark as checked
-      walletAppEmbed.hasAutoChecked = true;
       
       // Try multiple times with increasing delays to ensure widget is injected
       let attempts = 0;
@@ -1255,8 +1225,6 @@
           setTimeout(tryAutoCheck, 300);
         } else {
           console.log('[Wallet Widget] Failed to find widget after', maxAttempts, 'attempts');
-          // Reset flag if we failed, so it can try again later
-          walletAppEmbed.hasAutoChecked = false;
         }
       }
       
@@ -1279,3 +1247,4 @@
   console.log('[Wallet Widget] Initialized and watching for cart');
 })();
 </script>
+{% endif %}
