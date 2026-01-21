@@ -37,6 +37,16 @@
     
     <!-- Wallet Dashboard -->
     <div id="wallet-portal-dashboard" class="wallet-portal-section" style="display: none;">
+      <!-- User Info Header -->
+      <div class="wallet-user-header">
+        <div class="wallet-user-info">
+          <span id="wallet-user-email"></span>
+        </div>
+        <button class="wallet-logout-button" onclick="walletPortal.logout()">
+          Logout
+        </button>
+      </div>
+      
       <!-- Balance Card -->
       <div class="wallet-card wallet-balance-card">
         <div class="wallet-balance-header">
