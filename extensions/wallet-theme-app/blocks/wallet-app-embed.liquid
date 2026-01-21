@@ -27,11 +27,11 @@
     
     <div id="wallet-embed-login" class="wallet-embed-login">
       <input 
-        type="email" 
+        type="text" 
         id="wallet-embed-email" 
-        placeholder="Email address"
+        placeholder="Email or phone number"
         class="wallet-embed-input"
-        autocomplete="email"
+        autocomplete="email tel"
       />
       <button class="wallet-embed-button" data-wallet-action="check-balance">
         Check balance
@@ -416,23 +416,49 @@
   
   window.walletAppEmbed = {
     currentEmail: '',
+    currentPhone: '',
     currentBalance: 0,
     cartTotal: 0,
     coinValue: 1, // 1 coin = ₹1 (changed from 0.01)
+    isAuthenticated: false,
+    authSource: null, // 'shopify' or 'manual'
+    
+    // Clear all cached wallet data
+    clearCachedData: function() {
+      console.log('[Wallet Widget] Clearing cached data');
+      localStorage.removeItem('walletEmail');
+      localStorage.removeItem('walletPhone');
+      localStorage.removeItem('walletBalance');
+      localStorage.removeItem('walletAuthSource');
+      this.currentEmail = '';
+      this.currentPhone = '';
+      this.currentBalance = 0;
+      this.isAuthenticated = false;
+      this.authSource = null;
+    },
     
     // Load saved email from localStorage or logged-in customer
     init: function() {
       // Check if customer is logged in (Shopify provides this)
       {% if customer %}
       const loggedInEmail = {{ customer.email | json }};
+      const loggedInPhone = {{ customer.phone | json }};
+      
       if (loggedInEmail) {
-        console.log('[Wallet Widget] Customer logged in:', loggedInEmail);
+        console.log('[Wallet Widget] Shopify customer logged in:', loggedInEmail);
         this.currentEmail = loggedInEmail;
+        this.currentPhone = loggedInPhone || '';
+        this.isAuthenticated = true;
+        this.authSource = 'shopify';
         
-        // Save to localStorage
+        // Save to localStorage (will be cleared on logout)
         localStorage.setItem('walletEmail', loggedInEmail);
+        if (loggedInPhone) {
+          localStorage.setItem('walletPhone', loggedInPhone);
+        }
+        localStorage.setItem('walletAuthSource', 'shopify');
         
-        // Load balance from server
+        // Load balance from server automatically
         setTimeout(() => {
           const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
           if (emailInput) {
@@ -444,33 +470,27 @@
       }
       {% endif %}
       
-      // Fallback: check localStorage for saved session
-      const savedEmail = localStorage.getItem('walletEmail');
-      const savedBalance = localStorage.getItem('walletBalance');
+      // No Shopify customer logged in - clear any cached data
+      console.log('[Wallet Widget] No Shopify customer logged in - guest mode');
+      this.clearCachedData();
       
-      if (savedEmail && savedBalance) {
-        console.log('[Wallet Widget] Found saved session:', savedEmail);
-        this.currentEmail = savedEmail;
-        this.currentBalance = parseInt(savedBalance) || 0;
+      // Show the balance check form (don't pre-fill anything)
+      setTimeout(() => {
+        const loginContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-login');
+        const displayContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-display');
         
-        // Pre-fill and show balance section
-        setTimeout(() => {
-          const emailInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-email');
-          if (emailInput) {
-            emailInput.value = savedEmail;
-          }
-          
-          // Show balance immediately with saved data
-          this.displayBalance(this.currentBalance);
-          
-          // Then refresh from server in background
-          this.refreshBalance();
-        }, 500);
-      }
+        if (loginContainer) loginContainer.style.display = 'flex';
+        if (displayContainer) displayContainer.style.display = 'none';
+        
+        console.log('[Wallet Widget] Guest mode - showing balance check form');
+      }, 500);
     },
     
-    displayBalance: function(balance) {
+    displayBalance: function(balance, source) {
       this.currentBalance = balance;
+      if (source) {
+        this.authSource = source;
+      }
       
       const balanceEl = document.querySelector('#wallet-app-embed-injected #wallet-embed-balance-display');
       const displayContainer = document.querySelector('#wallet-app-embed-injected #wallet-embed-display');
@@ -479,6 +499,11 @@
       if (balanceEl) balanceEl.textContent = balance + ' points';
       if (displayContainer) displayContainer.style.display = 'flex';
       if (loginContainer) loginContainer.style.display = 'none';
+      
+      // Only cache balance if authenticated via Shopify
+      if (this.authSource === 'shopify') {
+        localStorage.setItem('walletBalance', balance);
+      }
       
       // Set up coin input listener
       const coinsInput = document.querySelector('#wallet-app-embed-injected #wallet-embed-coins-input');
@@ -755,49 +780,80 @@
         return;
       }
       
-      const email = emailEl.value.trim();
-      if (!email) {
-        this.showMessage('Please enter your email', 'error');
+      const input = emailEl.value.trim();
+      if (!input) {
+        this.showMessage('Please enter your email or phone', 'error');
         return;
       }
 
-      // Basic email validation
-      if (!email.includes('@')) {
-        this.showMessage('Please enter a valid email', 'error');
+      // Detect if input is email or phone
+      const isEmail = input.includes('@');
+      const isPhone = /^\d+$/.test(input);
+      
+      if (!isEmail && !isPhone) {
+        this.showMessage('Please enter a valid email or phone number', 'error');
         return;
       }
 
       try {
-        const response = await fetch(
-          API_BASE + '/wallet/balance?email=' + encodeURIComponent(email),
-          {
-            headers: {
-              'x-shop-url': shop,
-            },
-          }
-        );
+        let response;
+        
+        if (isEmail) {
+          console.log('[Wallet Widget] Checking balance by email:', input);
+          response = await fetch(
+            API_BASE + '/wallet/balance?email=' + encodeURIComponent(input),
+            {
+              headers: {
+                'x-shop-url': shop,
+              },
+            }
+          );
+        } else {
+          console.log('[Wallet Widget] Checking balance by phone:', input);
+          response = await fetch(
+            API_BASE + '/wallet/balance?phone=' + encodeURIComponent(input),
+            {
+              headers: {
+                'x-shop-url': shop,
+              },
+            }
+          );
+        }
 
         const data = await response.json();
 
         if (data.success) {
-          this.currentEmail = email;
+          if (isEmail) {
+            this.currentEmail = input;
+          } else {
+            this.currentPhone = input;
+          }
           this.currentBalance = data.walletCoins || 0;
           
-          // Save to localStorage for faster loading next time
-          localStorage.setItem('walletEmail', email);
-          localStorage.setItem('walletBalance', this.currentBalance);
+          // Set auth source based on whether this is Shopify customer or manual entry
+          const authSource = this.isAuthenticated ? 'shopify' : 'manual';
+          
+          // Only save to localStorage if authenticated via Shopify
+          if (authSource === 'shopify') {
+            if (isEmail) {
+              localStorage.setItem('walletEmail', input);
+            } else {
+              localStorage.setItem('walletPhone', input);
+            }
+            localStorage.setItem('walletBalance', this.currentBalance);
+          }
           
           if (this.currentBalance > 0) {
-            this.displayBalance(this.currentBalance);
+            this.displayBalance(this.currentBalance, authSource);
             this.showMessage('Balance loaded!', 'success');
-            console.log('[Wallet Widget] Balance loaded:', this.currentBalance, 'coins');
+            console.log('[Wallet Widget] Balance loaded:', this.currentBalance, 'coins (source:', authSource, ')');
           } else {
             // No coins available
-            this.showMessage('No coins available for this email', 'error');
-            console.log('[Wallet Widget] No coins found for:', email);
+            this.showMessage('No coins available for this ' + (isEmail ? 'email' : 'phone'), 'error');
+            console.log('[Wallet Widget] No coins found for:', input);
           }
         } else {
-          this.showMessage('Email not found. Please check your email or phone number.', 'error');
+          this.showMessage((isEmail ? 'Email' : 'Phone') + ' not found. Please check your ' + (isEmail ? 'email' : 'phone number') + '.', 'error');
         }
       } catch (err) {
         console.error('[Wallet Widget] Error:', err);
@@ -855,7 +911,8 @@
         
         // Send request to backend to create discount and deduct coins
         const requestBody = {
-          email: this.currentEmail,
+          email: this.currentEmail || undefined,
+          phone: this.currentPhone || undefined,
           coinsToRedeem: coinsToUse,
           discountAmount: discountAmount,
           discountCode: discountCode,
