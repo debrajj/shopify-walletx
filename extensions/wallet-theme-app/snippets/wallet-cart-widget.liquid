@@ -5,9 +5,14 @@
         <div class="wallet-balance-label">Your balance</div>
         <div class="wallet-balance-amount" id="wallet-balance-display">815 points</div>
       </div>
-      <button class="wallet-redeem-button" onclick="walletCartWidget.showRedeemForm()">
-        Redeem points
-      </button>
+      <div class="wallet-cart-actions">
+        <button class="wallet-redeem-button" onclick="walletCartWidget.showRedeemForm()">
+          Redeem points
+        </button>
+        <button class="wallet-logout-button-small" onclick="walletCartWidget.logout()" title="Logout">
+          ✕
+        </button>
+      </div>
     </div>
     
     <div id="wallet-cart-redeem" class="wallet-cart-redeem" style="display: none;">
@@ -62,6 +67,12 @@
     gap: 16px;
   }
 
+  .wallet-cart-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
   .wallet-balance-section {
     flex: 1;
   }
@@ -96,6 +107,27 @@
   .wallet-redeem-button:hover {
     background: #fafafa;
     border-color: #ccc;
+  }
+
+  .wallet-logout-button-small {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wallet-logout-button-small:hover {
+    background: #d32f2f;
   }
 
   .wallet-cart-redeem {
@@ -292,6 +324,26 @@
       setTimeout(() => {
         window.location.href = '/discount/' + discountCode + '?redirect=/checkout';
       }, 800);
+    },
+
+    logout: function() {
+      // Clear current session
+      this.currentPhone = '';
+      this.currentBalance = 0;
+      
+      // Reset form
+      document.getElementById('wallet-phone').value = '';
+      document.getElementById('wallet-coins-input').value = '';
+      
+      // Hide wallet display and redeem form, show login
+      document.getElementById('wallet-cart-display').style.display = 'none';
+      document.getElementById('wallet-cart-redeem').style.display = 'none';
+      document.getElementById('wallet-cart-login').style.display = 'block';
+      
+      // Clear balance display
+      document.getElementById('wallet-balance-display').textContent = '0 points';
+      
+      this.showMessage('Logged out successfully', 'success');
     }
   };
 
